@@ -1,19 +1,18 @@
-name: Deploy spec
-
-on: [push]
-
+name: Publish Spec to gh-pages
+on:
+  push:
+    branches: [ main ]
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-node@v1
-      with:
-        node-version: '12.x'
-    - run: npm install
-    - run: npm run build
-    - name: commit changes
-      uses: elstudio/actions-js-build/commit@v3
-      with:
-        commitMessage: "fixup: [spec] `npm run build`"
+      - uses: actions/checkout@v2
+      - run: npm install --legacy-peer-deps
+      - run: npm run compile
+      - name: Deploy
+        uses: JamesIves/github-pages-deploy-action@4.1.4
+        with:
+          branch: gh-pages
+          folder: docs
+          clean-exclude: |
+            pr           

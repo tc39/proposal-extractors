@@ -1,20 +1,30 @@
 {
+  "name": "proposal-extractors",
+  "version": "0.0.0",
   "private": true,
-  "name": "template-for-proposals",
-  "description": "A repository template for ECMAScript proposals.",
+  "description": "ECMAScript Extractors",
+  "homepage": "https://github.com/tc39/proposal-extractors#readme",
+  "author": {
+    "name": "Ron Buckton",
+    "email": "ron.buckton@microsoft.com"
+  },
+  "keywords": [
+    "javascript",
+    "ecmascript"
+  ],
   "scripts": {
-    "start": "npm run build-loose -- --watch",
-    "build": "npm run build-loose -- --strict",
-    "build-loose": "ecmarkup --load-biblio @tc39/ecma262-biblio --verbose spec.emu index.html --lint-spec"
+    "compile": "gulp build",
+    "start": "gulp start"
   },
-  "homepage": "https://github.com/tc39/template-for-proposals#readme",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/tc39/template-for-proposals.git"
-  },
-  "license": "MIT",
+  "license": "SEE LICENSE IN https://tc39.es/ecma262/#sec-copyright-and-software-license",
   "devDependencies": {
-    "@tc39/ecma262-biblio": "^2.1.2390",
-    "ecmarkup": "^14.1.1"
-  }
+    "@tc39/ecma262-biblio": "^2.0.2322",
+    "del": "^6.0.0",
+    "ecmarkup": "^12.1.0",
+    "gulp": "^4.0.2",
+    "gulp-emu": "^2.1.0",
+    "gulp-live-server": "0.0.31",
+    "gulp-rename": "^2.0.0"
+  },
+  "repository": "tc39/proposal-extractors"
 }
