@@ -32,7 +32,7 @@ destructuring using the new form, the `Symbol.matcher` method would be called an
 
 ## Status
 
-**Stage:** 0  \
+**Stage:** 1  \
 **Champion:** Ron Buckton (@rbuckton)  
 
 _For more information see the [TC39 proposal process](https://tc39.es/process-document/)._
