@@ -96,8 +96,8 @@ class Book {
     isbn,
     title,
     // Extract `createdAt` as an Instant
-    InstantExtractor(createdAt) = Temporal.Now.instant(),
-    InstantExtractor(modifiedAt) = createdAt
+    createdAt: InstantExtractor(createdAt) = Temporal.Now.instant(),
+    modifiedAt: InstantExtractor(modifiedAt) = createdAt
   }) {
     this.isbn = isbn;
     this.title = title;
