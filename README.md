@@ -2,27 +2,25 @@
 
 A proposal to introduce Extractors (a.k.a. "Extractor Objects") to ECMAScript.
 
-Extractors would augment the syntax for _BindingPattern_ and _AssignmentPattern_ to allow for new destructuring forms, as in
-the following example:
+Extractors would augment the syntax for _BindingPattern_ and _AssignmentPattern_ to allow for new destructuring forms,
+as in the following example:
 
 ```js
 // binding patterns
 const Foo(y) = x;           // instance-array destructuring
-const Foo{y} = x;           // instance-object destructuring
+const Foo([y]) = x;         // nested array destructuring
+const Foo({y}) = x;         // nested object destructuring
 const [Foo(y)] = x;         // nesting
-const [Foo{y}] = x;         // ..
 const { z: Foo(y) } = x;    // ..
-const { z: Foo{y} } = x;    // ..
 const Foo(Bar(y)) = x;      // ..
 const X.Foo(y) = x;         // qualified names (i.e., a.b.c)
 
 // assignment patterns
 Foo(y) = x;                 // instance-array destructuring
-Foo{y} = x;                 // instance-object destructuring
+Foo([y]) = x;               // nestedarray destructuring
+Foo({y}) = x;               // nested object destructuring
 [Foo(y)] = x;               // nesting
-[Foo{y}] = x;               // ..
 ({ z: Foo(y) } = x);        // ..
-({ z: Foo{y} } = x);        // ..
 Foo(Bar(y)) = x;            // ..
 X.Foo(y) = x;               // qualified names (i.e., a.b.c)
 ```
@@ -138,24 +136,24 @@ match (x) {
 // Another ADT enum example:
 enum Message of ADT {
   Quit,
-  Move{x, y},
+  Move({x, y}),
   Write(message),
   ChangeColor(r, g, b),
 }
 
 // construction
-const msg1 = Message.Move{ x: 10, y: 10 }; // NOTE: possible novel sytax for enum construction
+const msg1 = Message.Move({ x: 10, y: 10 });
 const msg2 = Message.Write("Hello");
 const msg3 = Message.ChangeColor(0x00, 0xff, 0xff);
 
 // destructuring
-const Message.Move{ x, y } = msg1;      // x: 10, y: 10
+const Message.Move({ x, y }) = msg1;    // x: 10, y: 10
 const Message.Write(message) = msg2;    // message: "Hello"
 const Message.ChangeColor(r, g, b);     // r: 0, g: 255, b: 255
 
 // pattern matching
 match (msg) {
-  when Message.Move{ x, y }: ...;
+  when Message.Move({ x, y }): ...;
   when Message.Write(message): ...;
   when Message.ChangeColor(r, g, b): ...;
   when Message.Quit: ...;
@@ -164,24 +162,23 @@ match (msg) {
 
 # Proposed Solution
 
-_Extractors_ are loosely based on Scala's [Extractor Objects](https://docs.scala-lang.org/tour/extractor-objects.html) and
-Rust's [Pattern Matching](https://doc.rust-lang.org/book/ch18-00-patterns.html). Extractors extend the syntax for
-_BindingPattern_ and _AssignmentPattern_ to allow for the evaluation of user-defined logic for validation and transformation.
+_Extractors_ are loosely based on Scala's [Extractor Objects](https://docs.scala-lang.org/tour/extractor-objects.html)
+and Rust's [Pattern Matching](https://doc.rust-lang.org/book/ch18-00-patterns.html). Extractors extend the syntax for
+_BindingPattern_ and _AssignmentPattern_ to allow for the evaluation of user-defined logic for validation and
+transformation.
 
-Extractors come in two flavors: _Array Extractors_, which perform array destructuring on a successful match result, and
-_Object Extractors_, which perform object destructuring. Both types of extractors start with a reference to a value in scope
+Extractors perform array destructuring on a successful match result, starting with a reference to a value in scope
 using a _QualifiedName_, which is essentially an _IdentifierReference_ (i.e., `Point`, `InstantExtractor`, etc.) or a 
 dotted-name (i.e., `Option.Some`, `Message.Move`, etc.).
 
-When an Extractor is evaluated during destructuring, its _QualifiedName_ is evaluated, and that evaluated result's `[Symbol.matcher]` 
-method is invoked with the current value to be destructured, returning a _Match Result_ object like `{ matched: boolean, value: object }`.
+When an Extractor is evaluated during destructuring, its _QualifiedName_ is evaluated, and that evaluated result's
+`[Symbol.matcher]()` method is invoked with the current value to be destructured, returning a _Match Result_ object like
+`{ matched: boolean, value: object }`.
 
-If `matched` is `true`, the `value` property is further destructured based on the type of Extractor that was defined. If `matched` is 
-`false`, a *TypeError* is thrown.
+If `matched` is `true`, the `value` property is further destructured based on the type of Extractor that was defined. If
+`matched` is `false`, a *TypeError* is thrown.
 
-## Array Extractors
-
-An _Array Extractor_ consists of a _QualifiedName_ followed by a parenthesized list of additional destructuring patterns:
+An _Extractor_ consists of a _QualifiedName_ followed by a parenthesized list of additional destructuring patterns:
 
 ```js
 // binding pattern
@@ -211,23 +208,48 @@ Parentheses (`()`) are used instead of square brackets (`[]`) for several reason
   Option.Some(y) = opt;
   ```
 
-## Object Extractors
+## Object Destructuring using Extractors
 
-An _Object Extractor_ consists of a _QualifiedName_ followed by an object destructuring pattern:
+Extractors do not introduce a novel syntax for object extraction. Instead, an Extractor can return a single element
+match result containing the object to be further destructured:
 
 ```js
 // binding pattern
-const Message.Move{ x, y } = ...;
+const Message.Move({ x, y }) = ...;
 
 // assignment pattern
-(Message.Move{ x, y } = ...);
+(Message.Move({ x, y }) = ...);
 ```
 
-Curly braces (`{}`) are used here to be otherwise consistent with normal object destructuring. Outermost parentheses would also
-likely be required to avoid too large of a syntax carve-out for `identifier { ... }` at the statement level.
+### Iterable Wrapper Overhead
 
-The use of curly braces here is also intended to mirror a potential future property-literal construction syntax that might be used
-by Algebraic Data Types or other constructors, i.e.:
+It's important to note that this has the overhead of allocating an iterable wrapper object to perform further
+destructuring. If necessary, this overhead could be removed if we consider an alternative representation for a match
+result that indicates result is the sole extracted value, i.e.:
+
+```js
+const Message = {
+  Move: class Move {
+    #x;
+    #y;
+    ...
+    static [Symbol.match](value) {
+      if (value instanceof Message.Move) {
+        // 'match: "unary"' indicates that 'value' is the sole extracted value
+        return { match: "unary", value: { x: value.#x, y: value.#y } };
+      }
+      return { match: false };
+    }
+  }
+};
+
+const Message.Move({ x, y }) = ...;
+```
+
+### Future Object Extractor Syntax
+
+It is possible that a future property-literal construction syntax that might be used by Algebraic Data Types or other
+constructors, i.e.:
 
 ```js
 const enum Message of ADT {
@@ -244,6 +266,11 @@ const msg = Message.Move{ x: 10, y: 20 };
 struct Point { x, y };
 const pt = Point{ x: 10, y: 20 };
 ```
+
+However, such a syntax is currently out of scope for this proposal. In addition, introducing an `Identifier {` syntax
+for extractors has the high likelihood of carving off too much syntax space that could be used by other proposals. As
+a result, an "Object Extractor" like syntax like `const Point{ x, y } = p` is not being considered part of this proposal
+at this time.
 
 # Prior Art
 
@@ -294,13 +321,13 @@ const [y] = %InvokeCustomMatcherOrThrow%(Foo, x);
 The statement
 
 ```js
-const Foo{y} = x;
+const Foo({y}) = x;
 ```
 
 is approximately the same as the following transposed representation
 
 ```js
-const {y} = %InvokeCustomMatcherOrThrow%(Foo, x);
+const [{y}] = %InvokeCustomMatcherOrThrow%(Foo, x);
 ```
 
 ## Nested Extractor Destructuring
@@ -329,7 +356,7 @@ const MapExtractor = {
     for (const [key, value] of map) {
       obj[typeof key === "symbol" ? key : `${key}`] = value;
     }
-    return { matched: true, value: obj };
+    return { matched: true, value: [obj] };
   }
 };
 
@@ -341,14 +368,14 @@ const obj = {
 The statement
 
 ```js
-const { map: MapExtractor{ a, b } } = obj;
+const { map: MapExtractor({ a, b }) } = obj;
 ```
 
 is approximately the same as the following transposed representation
 
 ```js
 const { map: _temp } = obj;
-const { a, b } = %InvokeCustomMatcherOrThrow%(MapExtractor, _temp);
+const [{ a, b }] = %InvokeCustomMatcherOrThrow%(MapExtractor, _temp);
 ```
 
 ## Regular Expressions
@@ -361,13 +388,7 @@ RegExp.prototype[Symbol.matcher] = function (value) {
 
   return {
     matched: true,
-    value: {
-      // spread in named capture groups for use with object destructuring
-      ...match.groups,
-
-      // iterator for use with array destructuring
-      [Symbol.iterator]: () => match[Symbol.iterator]()
-    }
+    value: match
   }
 };
 
@@ -377,17 +398,19 @@ const IsoDateTime = /^(?<date>[^TZ]+)T(?<time>[^Z]+)Z/;
 
 // match `input`, extract, and destructure (or throw if match fails) using...
 
-// ...an object extractor
-const IsoDate{ year, month, day } = input;
+// ...a nested-object extractor
+const IsoDate({ groups: { year, month, day } }) = input;
 
-// ...an array extractor
-const IsoDate(, year, month, day) = input;
+// ...a nested-array extractor
+const IsoDate([, year, month, day]) = input;
 
 // concise, multi-step extraction using nested destructuring:
-const IsoDateTime{
-    date: IsoDate{ year, month, day },
-    time: IsoTime{ hours, minutes, seconds }
-} = input;
+const IsoDateTime({
+  groups: {
+    date: IsoDate({ groups: { year, month, day } }),
+    time: IsoTime({ groups: { hours, minutes, seconds }})
+  }
+}) = input;
 // 1. Matches `input` via `IsoDatTime` RegExp and extracts `date` and `time`
 // 2. Matches `date` via `IsoDate` RegExp and extracts `year`, `month`, and `day` as lexical bindings
 // 3. Matches `time` vai `IsoTime` RegExp and extracts `hours`, `minutes`, and `seconds` as lexical bindings
@@ -398,53 +421,39 @@ const IsoDateTime{
 The grammar definition in this section is very early and subject to change.
 
 ```diff grammarkdown
-++  QualifiedName[Yield, Await] :
-++      IdentifierReference[?Yield, ?Await]
-++      QualifiedName[?Yield, ?Await] `.` IdentifierName
++   QualifiedName[Yield, Await] :
++       IdentifierReference[?Yield, ?Await]
++       QualifiedName[?Yield, ?Await] `.` IdentifierName
 
     BindingPattern[Yield, Await] :
         ObjectBindingPattern[?Yield, ?Await]
         ArrayBindingPattern[?Yield, ?Await]
-++      QualifiedName[?Yield, ?Await] ExtractorBindingPattern[?Yield, ?Await]
++       QualifiedName[?Yield, ?Await] ExtractorBindingPattern[?Yield, ?Await]
 
-++  ExtractorBindingPattern[Yield, Await] :
-++      ExtractorObjectBindingPattern[?Yield, ?Await]
-++      ExtractorArrayBindingPattern[?Yield, ?Await]
-
-++  ExtractorObjectBindingPattern[Yield, Await] :
-++      ObjectBindingPattern[?Yield, ?Await]
-
-++  ExtractorArrayBindingPattern[Yield, Await] :
-++      `(` Elision? BindingRestElement[?Yield, ?Await]? `)`
-++      `(` BindingElementList[?Yield, ?Await] `)`
-++      `(` BindingElementList[?Yield, ?Await] `,` Elision? BindingRestElement[?Yield, ?Await]? `)`
++   ExtractorBindingPattern[Yield, Await] :
++       `(` Elision? BindingRestElement[?Yield, ?Await]? `)`
++       `(` BindingElementList[?Yield, ?Await] `)`
++       `(` BindingElementList[?Yield, ?Await] `,` Elision? BindingRestElement[?Yield, ?Await]? `)`
 
     AssignmentPattern[Yield, Await] :
         ObjectAssignmentPattern[?Yield, ?Await]
         ArrayAssignmentPattern[?Yield, ?Await]
-++      QualifiedName[?Yield, ?Await] ExtractorAssignmentPattern[?Yield, ?Await]
++       QualifiedName[?Yield, ?Await] ExtractorAssignmentPattern[?Yield, ?Await]
 
-++  ExtractorAssignmentPattern[Yield, Await] :
-++      ExtractorObjectAssignmentPattern[?Yield, ?Await]
-++      ExtractorArrayAssignmentPattern[?Yield, ?Await]
++   ExtractorAssignmentPattern[Yield, Await] :
++       `(` Elision? BindingRestElement[?Yield, ?Await]? `)`
++       `(` BindingElementList[?Yield, ?Await] `)`
++       `(` BindingElementList[?Yield, ?Await] `,` Elision? BindingRestElement[?Yield, ?Await]? `)`
 
-++  ExtractorObjectAssignmentPattern[Yield, Await] :
-++      ObjectAssignmentPattern[?Yield, ?Await]
-
-++  ExtractorArrayAssignmentPattern[Yield, Await] :
-++      `(` Elision? BindingRestElement[?Yield, ?Await]? `)`
-++      `(` BindingElementList[?Yield, ?Await] `)`
-++      `(` BindingElementList[?Yield, ?Await] `,` Elision? BindingRestElement[?Yield, ?Await]? `)`
-
-++  FunctionCall[Yield, Await] :
-++      CallExpression[?Yield, ?Await] Arguments[?Yield, ?Await]
++   FunctionCall[Yield, Await] :
++       CallExpression[?Yield, ?Await] Arguments[?Yield, ?Await]
 
     CallExpression[Yield, Await] :
         CoverCallExpressionAndAsyncArrowHead[?Yield, ?Await]
         SuperCall[?Yield, ?Await]
         ImportCall[?Yield, ?Await]
-++      FunctionCall[?Yield, ?Await]
---      CallExpression[?Yield, ?Await] Arguments[?Yield, ?Await]
++       FunctionCall[?Yield, ?Await]
+-       CallExpression[?Yield, ?Await] Arguments[?Yield, ?Await]
         CallExpression[?Yield, ?Await] `[` Expression[+In, ?Yield, ?Await] `]`
         CallExpression[?Yield, ?Await] `.` IdentifierName
         CallExpression[?Yield, ?Await] TemplateLiteral[?Yield, ?Await, +Tagged]
@@ -460,19 +469,13 @@ The semantics in this section are very early and subject to change.
 The syntax-directed operation BindingInitialization takes arguments _value_ and _environment_.
 
 ```diff grammarkdown
-++  BindingPattern : QualifiedName ExtractorBindingPattern
++   BindingPattern : QualifiedName ExtractorBindingPattern
 ```
 
 1. <ins>Let _ref_ be the result of evaluating _QualifiedName_.</ins>
 1. <ins>Let _extractor_ be ? GetValue(_ref_).</ins>
 1. <ins>Let _obj_ be ? InvokeCustomMatcherOrThrow(_extractor_, _value_).</ins>
-1. <ins>Return the result of performing BindingInitialization of _ExtractorBindingPattern_ with arguments _obj_ and _environment_.</ins>
-
-```diff grammarkdown
-++  ExtractorBindingPattern : ExtractorArrayBindingPattern
-```
-
-1. <ins>Let _iteratorRecord_ be ? GetIterator(_value_).</ins>
+1. <ins>Let _iteratorRecord_ be ? GetIterator(_obj_).</ins>
 1. <ins>Let _result_ be IteratorBindingInitialization of _ExtractorBindingPattern_ with arguments _iteratorRecord_ and _environment_.</ins>
 1. <ins>If _iteratorRecord_.\[\[Done]] is **false**, return ? IteratorClose(_iteratorRecord_, _result_).</ins>
 1. <ins>Return _result_.</ins>
@@ -489,21 +492,21 @@ The syntax-directed operation IteratorBindingInitialization takes arguments _ite
 
 ```diff grammarkdown
     ArrayBindingPattern : `[` `]`
-++  ExtractorBindingPattern : `(` `)`
++   ExtractorBindingPattern : `(` `)`
 ```
 
 1. Return NormalCompletion(empty).
 
 ```diff grammarkdown
     ArrayBindingPattern : `[` Elision `]`
-++  ExtractorBindingPattern : `(` Elision `)`
++   ExtractorBindingPattern : `(` Elision `)`
 ```
 
 1. Return the result of performing IteratorDestructuringAssignmentEvaluation of _Elision_ with _iteratorRecord_ as the argument.
 
 ```diff grammarkdown
     ArrayBindingPattern : `[` Elision? BindingRestElement `]`
-++  ExtractorBindingPattern : `(` Elision? BindingRestElement `)`
++   ExtractorBindingPattern : `(` Elision? BindingRestElement `)`
 ```
 
 1. If _Elision_ is present, then
@@ -512,7 +515,7 @@ The syntax-directed operation IteratorBindingInitialization takes arguments _ite
 
 ```diff grammarkdown
     ArrayBindingPattern : `[` BindingElementList `,` Elision `]`
-++  ExtractorBindingPattern : `(` BindingElementList `,` Elision `)`
++   ExtractorBindingPattern : `(` BindingElementList `,` Elision `)`
 ```
 
 1. Perform ? IteratorBindingInitialization for _BindingElementList_ with _iteratorRecord_ and _environment_ as arguments.
@@ -520,7 +523,7 @@ The syntax-directed operation IteratorBindingInitialization takes arguments _ite
 
 ```diff grammarkdown
     ArrayBindingPattern : `[` BindingElementList `,` Elision? BindingRestElement `]`
-++  ExtractorBindingPattern : `(` BindingElementList `,` Elision? BindingRestElement `)`
++   ExtractorBindingPattern : `(` BindingElementList `,` Elision? BindingRestElement `)`
 ```
 
 1. Perform ? IteratorBindingInitialization for _BindingElementList_ with _iteratorRecord_ and _environment_ as arguments.
@@ -581,7 +584,7 @@ If _LeftHandSideExpression_ is neither an _ObjectLiteral_<ins>,</ins> nor an _Ar
 The syntax-directed operation DestructuringAssignmentEvaluation takes argument _value_. It is defined piecewise over the following productions:
 
 ```diff grammarkdown
-++  AssignmentPattern : QualifiedName ExtractorAssignmentPattern
++   AssignmentPattern : QualifiedName ExtractorAssignmentPattern
 ```
 
 1. <ins>Let _ref_ be the result of evaluating _QualifiedName_.</ins>
@@ -591,7 +594,7 @@ The syntax-directed operation DestructuringAssignmentEvaluation takes argument _
 
 ```diff grammarkdown
     ArrayAssignmentPattern : `[` `]`
-++  ExtractorArrayAssignmentPattern : `(` `)`
++   ExtractorAssignmentPattern : `(` `)`
 ```
 
 1. Let _iteratorRecord_ be ? GetIterator(_value_).
@@ -599,7 +602,7 @@ The syntax-directed operation DestructuringAssignmentEvaluation takes argument _
 
 ```diff grammarkdown
     ArrayAssignmentPattern : `[` Elision `]`
-++  ExtractorArrayAssignmentPattern : `(` Elision `)`
++   ExtractorAssignmentPattern : `(` Elision `)`
 ```
 
 
@@ -610,7 +613,7 @@ The syntax-directed operation DestructuringAssignmentEvaluation takes argument _
 
 ```diff grammarkdown
     ArrayAssignmentPattern : `[` Elision? AssignmentRestElement `]`
-++  ExtractorArrayAssignmentPattern : `(` Elision? AssignmentRestElement `)`
++   ExtractorAssignmentPattern : `(` Elision? AssignmentRestElement `)`
 ```
 
 1. Let _iteratorRecord_ be ? GetIterator(_value_).
@@ -625,7 +628,7 @@ The syntax-directed operation DestructuringAssignmentEvaluation takes argument _
 
 ```diff grammarkdown
     ArrayAssignmentPattern : `[` AssignmentElementList `]`
-++  ExtractorArrayAssignmentPattern : `(` AssignmentElementList `)`
++   ExtractorAssignmentPattern : `(` AssignmentElementList `)`
 ```
 
 1. Let _iteratorRecord_ be ? GetIterator(_value_).
@@ -635,7 +638,7 @@ The syntax-directed operation DestructuringAssignmentEvaluation takes argument _
 
 ```diff grammarkdown
     ArrayAssignmentPattern : `[` AssignmentElementList `,` Elision? AssignmentRestElement? `]`
-++  ExtractorArrayAssignmentPattern : `(` AssignmentElementList `,` Elision? AssignmentRestElement? `)`
++   ExtractorAssignmentPattern : `(` AssignmentElementList `,` Elision? AssignmentRestElement? `)`
 ```
 
 1. Let _iteratorRecord_ be ? GetIterator(_value_).
@@ -686,7 +689,7 @@ match (msg) {
   when (${Message.Move} with { x, y }): ...;
 
   // with extractors
-  when (Message.Move{ x, y }): ...;
+  when (Message.Move({ x, y })): ...;
 }
 ```
 
@@ -699,7 +702,7 @@ match (opt) {
   when (${Option.Some} with [${Message.Write} with [text]]): ...;
 
   // with extractors
-  when (Option.Some(Message.Move{ x, y })): ...;
+  when (Option.Some(Message.Move({ x, y }))): ...;
   when (Option.Some(Message.Write(text))): ...;
 }
 ```
@@ -713,24 +716,24 @@ _declaration_, _construction_, _destructuring_, and _pattern matching_, as in th
 ```js
 enum Message of ADT {
   Quit,
-  Move{x, y},
+  Move({x, y}),
   Write(message),
   ChangeColor(r, g, b),
 }
 
 // construction
-const msg1 = Message.Move{ x: 10, y: 10 };
+const msg1 = Message.Move({ x: 10, y: 10 });
 const msg2 = Message.Write("Hello");
 const msg3 = Message.ChangeColor(0x00, 0xff, 0xff);
 
 // destructuring
-const Message.Move{x, y} = msg1;        // x: 10, y: 10
+const Message.Move({x, y}) = msg1;      // x: 10, y: 10
 const Message.Write(message) = msg2;    // message: "Hello"
 const Message.ChangeColor(r, g, b);     // r: 0, g: 255, b: 255
 
 // pattern matching
 match (msg) {
-  when Message.Move{x, y}: ...;
+  when Message.Move({x, y}): ...;
   when Message.Write(message): ...;
   when Message.ChangeColor(r, g, b): ...;
   when Message.Quit: ...;
@@ -740,11 +743,11 @@ match (msg) {
 Here, declaration, construction, destructuring, and pattern matching are consistent for ADT enum members and values:
 
 ```js
-enum Message of ADT { Move{ x, y } }      // declaration
-const msg =   Message.Move{ x, y };       // construction
-const         Message.Move{ x, y } = msg; // destructuring
+enum Message of ADT { Move({ x, y }) }      // declaration
+const msg =   Message.Move({ x, y });       // construction
+const         Message.Move({ x, y }) = msg; // destructuring
 match (msg) {
-  when        Message.Move{ x, y }: ...;  // pattern matching
+  when        Message.Move({ x, y }): ...;  // pattern matching
 }
 ```
 
@@ -756,6 +759,10 @@ match (msg) {
   when        Message.Write(message): ...;  // pattern matching
 }
 ```
+
+As noted before, it is possible that a future property-literal construction syntax that might be used by Algebraic Data
+Types or other constructors. Adding a matching syntax for object extraction would be the responsibility of that proposal
+and is out of scope for this proposal.
 
 
 # TODO
