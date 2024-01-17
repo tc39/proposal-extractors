@@ -441,9 +441,9 @@ The grammar definition in this section is very early and subject to change.
 +       QualifiedName[?Yield, ?Await] ExtractorAssignmentPattern[?Yield, ?Await]
 
 +   ExtractorAssignmentPattern[Yield, Await] :
-+       `(` Elision? BindingRestElement[?Yield, ?Await]? `)`
-+       `(` BindingElementList[?Yield, ?Await] `)`
-+       `(` BindingElementList[?Yield, ?Await] `,` Elision? BindingRestElement[?Yield, ?Await]? `)`
++       `(` Elision? AssignmentRestElement[?Yield, ?Await]? `)`
++       `(` AssignmentElementList[?Yield, ?Await] `)`
++       `(` AssignmentElementList[?Yield, ?Await] `,` Elision? AssignmentRestElement[?Yield, ?Await]? `)`
 
 +   FunctionCall[Yield, Await] :
 +       CallExpression[?Yield, ?Await] Arguments[?Yield, ?Await]
