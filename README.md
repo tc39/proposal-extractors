@@ -149,7 +149,7 @@ const msg3 = Message.ChangeColor(0x00, 0xff, 0xff);
 // destructuring
 const Message.Move({ x, y }) = msg1;    // x: 10, y: 10
 const Message.Write(message) = msg2;    // message: "Hello"
-const Message.ChangeColor(r, g, b);     // r: 0, g: 255, b: 255
+const Message.ChangeColor(r, g, b) = msg3;     // r: 0, g: 255, b: 255
 
 // pattern matching
 match (msg) {
