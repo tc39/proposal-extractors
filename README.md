@@ -25,8 +25,8 @@ Foo(Bar(y)) = x;            // ..
 X.Foo(y) = x;               // qualified names (i.e., a.b.c)
 ```
 
-In addition, this would leverage the new `Symbol.matcher` built-in symbol added by the Pattern Matching proposal. When
-destructuring using the new form, the `Symbol.matcher` method would be called and its result would be destructured instead.
+In addition, this would leverage the new `Symbol.customMatcher` built-in symbol added by the Pattern Matching proposal. When
+destructuring using the new form, the `Symbol.customMatcher` method would be called and its result would be destructured instead.
 
 ## Status
 
@@ -81,12 +81,11 @@ With _Extractors_, such validation and transformation logic can be encapsulated 
 
 ```js
 const InstantExtractor = {
-  [Symbol.matcher]: value =>
-    value instanceof Temporal.Instant ? { matched: true, value: [value] } :
-    value instanceof Date ? { matched: true, value: [Temporal.Instant.fromEpochMilliseconds(value.getTime())] } :
-    typeof value === "string" ? { matched: true, value: [Temporal.Instant.from(value)] } :
-    { matched: false };
-  }
+  [Symbol.customMatcher]: value =>
+    value instanceof Temporal.Instant ? [value] :
+    value instanceof Date ? [Temporal.Instant.fromEpochMilliseconds(value.getTime())] :
+    typeof value === "string" ? [Temporal.Instant.from(value)] :
+    false
 };
 
 class Book {
@@ -168,17 +167,16 @@ _BindingPattern_ and _AssignmentPattern_ to allow for the evaluation of user-def
 transformation.
 
 Extractors perform array destructuring on a successful match result, starting with a reference to a value in scope
-using a _QualifiedName_, which is essentially an _IdentifierReference_ (i.e., `Point`, `InstantExtractor`, etc.) or a 
-dotted-name (i.e., `Option.Some`, `Message.Move`, etc.).
+using an _ExtractorMemberExpression_, which is essentially an _IdentifierReference_ (i.e., `Point`, `InstantExtractor`,
+etc.) or a dotted-name (i.e., `Option.Some`, `Message.Move`, etc.).
 
-When an Extractor is evaluated during destructuring, its _QualifiedName_ is evaluated, and that evaluated result's
-`[Symbol.matcher]()` method is invoked with the current value to be destructured, returning a _Match Result_ object like
-`{ matched: boolean, value: object }`.
+When an Extractor is evaluated during destructuring, its _ExtractorMemberExpression_ is evaluated, and that evaluated
+result's `[Symbol.customMatcher]()` method is invoked with the current value to be destructured, returning an iterable
+object that indicates the match succeeded, and the extracted elements to use for further destructuring. For the purpose
+of destructuring, any other value will produce a *TypeError*. In the case of pattern matching, `true` and `false` are
+also valid return values.
 
-If `matched` is `true`, the `value` property is further destructured based on the type of Extractor that was defined. If
-`matched` is `false`, a *TypeError* is thrown.
-
-An _Extractor_ consists of a _QualifiedName_ followed by a parenthesized list of additional destructuring patterns:
+An _Extractor_ consists of an _ExtractorMemberExpression_ followed by a parenthesized list of additional destructuring patterns:
 
 ```js
 // binding pattern
@@ -238,7 +236,7 @@ const Message = {
         // 'match: "unary"' indicates that 'value' is the sole extracted value
         return { match: "unary", value: { x: value.#x, y: value.#y } };
       }
-      return { match: false };
+      return false;
     }
   }
 };
@@ -291,13 +289,16 @@ at this time.
 The examples in this section use a desugaring to explain the underlying semantics, given the following helper:
 
 ```js
-function %InvokeCustomMatcher%(val, matchable) {
-    // see https://tc39.es/proposal-pattern-matching/#sec-custom-matcher
-}
-
-function %InvokeCustomMatcherOrThrow%(val, matchable) {
-  const result = %InvokeCustomMatcher%(val, matchable);
-  if (result === ~not-matched~) {
+function %InvokeCustomMatcherOrThrow%(extractor, subject) {
+  if (typeof extractor !== "object" || extractor === null) {
+    throw new TypeError();
+  }
+  const f = extractor[Symbol.customMatcher];
+  if (typeof f !== "function") {
+    throw new TypeError();
+  }
+  const result = f.call(extractor, [subject, "list"]);
+  if (typeof result !== "object" || result === null) {
     throw new TypeError();
   }
   return result;
@@ -351,12 +352,12 @@ Given the following definition
 
 ```js
 const MapExtractor = {
-  [Symbol.matcher](map) {
+  [Symbol.customMatcher](map) {
     const obj = {};
     for (const [key, value] of map) {
       obj[typeof key === "symbol" ? key : `${key}`] = value;
     }
-    return { matched: true, value: [obj] };
+    return [obj];
   }
 };
 
@@ -382,14 +383,9 @@ const [{ a, b }] = %InvokeCustomMatcherOrThrow%(MapExtractor, _temp);
 
 ```js
 // potentially built-in as part of Pattern Matching
-RegExp.prototype[Symbol.matcher] = function (value) {
+RegExp.prototype[Symbol.customMatcher] = function (value) {
   const match = this.exec(value);
-  if (match === null) return { matched: false };
-
-  return {
-    matched: true,
-    value: match
-  }
+  return !!match && [match];
 };
 
 const IsoDate = /^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})$/;
@@ -428,11 +424,11 @@ For the proposed semantics, see [the specification text](https://tc39.es/proposa
 
 This proposal would adopt (and continue to align with) the behavior of _Custom Matchers_ from the Pattern Matching proposal:
 
-- A _Custom Matcher_ is a regular ECMAScript Object value with a `[Symbol.matcher]` method that accepts a single argument and
+- A _Custom Matcher_ is a regular ECMAScript Object value with a `[Symbol.customMatcher]` method that accepts a single argument and
   returns a _Match Result_.
 - A _Match Result_ is a regular ECMAScript Object value with a `matched` property whose value is a Boolean, and a `value` property
   whose value will be destructured by the relevant Extractor pattern.
-- `Symbol.matcher` is a built-in Symbol value.
+- `Symbol.customMatcher` is a built-in Symbol value.
 
 # Relation to Pattern Matching
 
