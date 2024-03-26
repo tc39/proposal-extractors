@@ -2,11 +2,10 @@
 <meta charset="utf8">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/8.4/styles/github.min.css">
 <link rel="spec" href="es2015" />
-<script src="./spec.js"></script>
 <pre class="metadata">
 title: Extractors
 status: proposal
-stage: -1
+stage: 1
 contributors: Ron Buckton, Ecma International
 </pre>
 
@@ -14,5 +13,1194 @@ contributors: Ron Buckton, Ecma International
 
 <emu-intro id="intro">
   <h1>Introduction</h1>
-  <p>See <a href="https://github.com/rbuckton/proposal-extractors">the proposal repository</a> for background material and discussion.</p>
+  <p>See <a href="https://github.com/tc39/proposal-extractors">the proposal repository</a> for background material and discussion.</p>
+  <emu-note>
+    <p>Draft Note: Portions of this proposal are intended to align with <a href="https://github.com/tc39/proposal-pattern-matching">Pattern Matching</a>. Where appropriate, functionality shared with Pattern Matching will be called out with a Draft Note.</p>
+  </emu-note>
 </emu-intro>
+
+<emu-clause id="sec-ecmascript-data-types-and-values" aoid="Type" number="6">
+  <h1>ECMAScript Data Types and Values</h1>
+
+  <emu-clause id="sec-ecmascript-language-types">
+    <h1>ECMAScript Language Types</h1>
+
+    <emu-clause id="sec-ecmascript-language-types-symbol-type" number="5">
+      <h1>The Symbol Type</h1>
+
+      <emu-clause id="sec-well-known-symbols">
+        <h1>Well-Known Symbols</h1>
+        <emu-table id="table-1" caption="Well-known Symbols">
+          <table>
+            <tbody>
+            <tr>
+              <th>
+                Specification Name
+              </th>
+              <th>
+                [[Description]]
+              </th>
+              <th>
+                Value and Purpose
+              </th>
+            </tr>
+            <tr>
+              <td>
+                <ins><dfn>@@customMatcher</dfn></ins>
+              </td>
+              <td>
+                <ins>`"Symbol.customMatcher"`</ins>
+              </td>
+              <td>
+                <ins>A method that performs custom pattern matching and destructuring semantics. Called by the semantics of the pattern-matching and destructuring features.</ins>
+              </td>
+            </tr>
+            </tbody>
+          </table>
+        </emu-table>
+        <emu-note type="editor">
+          <p>Draft Note: @@customMatcher is also part of the <a href="https://github.com/tc39/proposal-pattern-matching">Pattern Matching</a> proposal.</p>
+        </emu-note>
+      </emu-clause>
+    </emu-clause>
+  </emu-clause>
+</emu-clause>
+
+<emu-clause id="sec-algorithm-conventions-syntax-directed-operations">
+  <h1>Syntax-Directed Operations</h1>
+
+  <emu-clause id="sec-syntax-directed-operations-scope-analysis">
+    <h1>Scope Analysis</h1>
+
+    <emu-clause id="sec-static-semantics-boundnames" oldids="sec-identifiers-static-semantics-boundnames,sec-let-and-const-declarations-static-semantics-boundnames,sec-variable-statement-static-semantics-boundnames,sec-destructuring-binding-patterns-static-semantics-boundnames,sec-for-in-and-for-of-statements-static-semantics-boundnames,sec-function-definitions-static-semantics-boundnames,sec-arrow-function-definitions-static-semantics-boundnames,sec-generator-function-definitions-static-semantics-boundnames,sec-async-generator-function-definitions-static-semantics-boundnames,sec-class-definitions-static-semantics-boundnames,sec-async-function-definitions-static-semantics-BoundNames,sec-async-arrow-function-definitions-static-semantics-BoundNames,sec-imports-static-semantics-boundnames,sec-exports-static-semantics-boundnames" type="sdo">
+      <h1>Static Semantics: BoundNames ( ): a List of Strings</h1>
+      <dl class="header">
+      </dl>
+      <emu-note id="note-star-default-star">
+        <p>*"\*default\*"* is used within this specification as a synthetic name for a module's default export when it does not have another name. An entry in the module's [[Environment]] is created with that name and holds the corresponding value, and resolving the export named *"default"* by calling <emu-xref href="#sec-resolveexport" title></emu-xref> for the module will return a ResolvedBinding Record whose [[BindingName]] is *"\*default\*"*, which will then resolve in the module's [[Environment]] to the above-mentioned value. This is done only for ease of specification, so that anonymous default exports can be resolved like any other export. This *"\*default\*"* string is never accessible to ECMAScript code or to the module linking algorithm.</p>
+      </emu-note>
+      <emu-grammar>BindingIdentifier : Identifier</emu-grammar>
+      <emu-alg>
+        1. Return a List whose sole element is the StringValue of |Identifier|.
+      </emu-alg>
+      <emu-grammar>BindingIdentifier : `yield`</emu-grammar>
+      <emu-alg>
+        1. Return « *"yield"* ».
+      </emu-alg>
+      <emu-grammar>BindingIdentifier : `await`</emu-grammar>
+      <emu-alg>
+        1. Return « *"await"* ».
+      </emu-alg>
+      <emu-grammar>LexicalDeclaration : LetOrConst BindingList `;`</emu-grammar>
+      <emu-alg>
+        1. Return the BoundNames of |BindingList|.
+      </emu-alg>
+      <emu-grammar>BindingList : BindingList `,` LexicalBinding</emu-grammar>
+      <emu-alg>
+        1. Let _names1_ be the BoundNames of |BindingList|.
+        1. Let _names2_ be the BoundNames of |LexicalBinding|.
+        1. Return the list-concatenation of _names1_ and _names2_.
+      </emu-alg>
+      <emu-grammar>LexicalBinding : BindingIdentifier Initializer?</emu-grammar>
+      <emu-alg>
+        1. Return the BoundNames of |BindingIdentifier|.
+      </emu-alg>
+      <emu-grammar>LexicalBinding : BindingPattern Initializer</emu-grammar>
+      <emu-alg>
+        1. Return the BoundNames of |BindingPattern|.
+      </emu-alg>
+      <emu-grammar>VariableDeclarationList : VariableDeclarationList `,` VariableDeclaration</emu-grammar>
+      <emu-alg>
+        1. Let _names1_ be BoundNames of |VariableDeclarationList|.
+        1. Let _names2_ be BoundNames of |VariableDeclaration|.
+        1. Return the list-concatenation of _names1_ and _names2_.
+      </emu-alg>
+      <emu-grammar>VariableDeclaration : BindingIdentifier Initializer?</emu-grammar>
+      <emu-alg>
+        1. Return the BoundNames of |BindingIdentifier|.
+      </emu-alg>
+      <emu-grammar>VariableDeclaration : BindingPattern Initializer</emu-grammar>
+      <emu-alg>
+        1. Return the BoundNames of |BindingPattern|.
+      </emu-alg>
+      <ins class="block">
+      <emu-grammar>BindingPattern : ExtractorMemberExpression ExtractorBindingPattern</emu-grammar>
+      <emu-alg>
+        1. Return the BoundNames of |ExtractorBindingPattern|.
+      </emu-alg>
+      </ins>
+      <emu-grammar>ObjectBindingPattern : `{` `}`</emu-grammar>
+      <emu-alg>
+        1. Return a new empty List.
+      </emu-alg>
+      <emu-grammar>ObjectBindingPattern : `{` BindingPropertyList `,` BindingRestProperty `}`</emu-grammar>
+      <emu-alg>
+        1. Let _names1_ be BoundNames of |BindingPropertyList|.
+        1. Let _names2_ be BoundNames of |BindingRestProperty|.
+        1. Return the list-concatenation of _names1_ and _names2_.
+      </emu-alg>
+      <emu-grammar>
+        ArrayBindingPattern : `[` Elision? `]`
+        <ins class="block">ExtractorBindingPattern : ExtractorMemberExpression `(` Elision? `)`</ins>
+      </emu-grammar>
+      <emu-alg>
+        1. Return a new empty List.
+      </emu-alg>
+      <emu-grammar>
+        ArrayBindingPattern : `[` Elision? BindingRestElement `]`
+        <ins class="block">ExtractorBindingPattern : ExtractorMemberExpression `(` Elision? BindingRestElement `)`</ins>
+      </emu-grammar>
+      <emu-alg>
+        1. Return the BoundNames of |BindingRestElement|.
+      </emu-alg>
+      <emu-grammar>
+        ArrayBindingPattern : `[` BindingElementList `,` Elision? `]`
+        <ins class="block">ExtractorBindingPattern : ExtractorMemberExpression `(` BindingElementList `,` Elision? `)`</ins>
+      </emu-grammar>
+      <emu-alg>
+        1. Return the BoundNames of |BindingElementList|.
+      </emu-alg>
+      <emu-grammar>
+        ArrayBindingPattern : `[` BindingElementList `,` Elision? BindingRestElement `]`
+        <ins class="block">ExtractorBindingPattern : ExtractorMemberExpression `(` BindingElementList `,` Elision? BindingRestElement `)`</ins>
+      </emu-grammar>
+      <emu-alg>
+        1. Let _names1_ be BoundNames of |BindingElementList|.
+        1. Let _names2_ be BoundNames of |BindingRestElement|.
+        1. Return the list-concatenation of _names1_ and _names2_.
+      </emu-alg>
+      <emu-grammar>BindingPropertyList : BindingPropertyList `,` BindingProperty</emu-grammar>
+      <emu-alg>
+        1. Let _names1_ be BoundNames of |BindingPropertyList|.
+        1. Let _names2_ be BoundNames of |BindingProperty|.
+        1. Return the list-concatenation of _names1_ and _names2_.
+      </emu-alg>
+      <emu-grammar>BindingElementList : BindingElementList `,` BindingElisionElement</emu-grammar>
+      <emu-alg>
+        1. Let _names1_ be BoundNames of |BindingElementList|.
+        1. Let _names2_ be BoundNames of |BindingElisionElement|.
+        1. Return the list-concatenation of _names1_ and _names2_.
+      </emu-alg>
+      <emu-grammar>BindingElisionElement : Elision? BindingElement</emu-grammar>
+      <emu-alg>
+        1. Return BoundNames of |BindingElement|.
+      </emu-alg>
+      <emu-grammar>BindingProperty : PropertyName `:` BindingElement</emu-grammar>
+      <emu-alg>
+        1. Return the BoundNames of |BindingElement|.
+      </emu-alg>
+      <emu-grammar>SingleNameBinding : BindingIdentifier Initializer?</emu-grammar>
+      <emu-alg>
+        1. Return the BoundNames of |BindingIdentifier|.
+      </emu-alg>
+      <emu-grammar>BindingElement : BindingPattern Initializer?</emu-grammar>
+      <emu-alg>
+        1. Return the BoundNames of |BindingPattern|.
+      </emu-alg>
+      <emu-grammar>ForDeclaration : LetOrConst ForBinding</emu-grammar>
+      <emu-alg>
+        1. Return the BoundNames of |ForBinding|.
+      </emu-alg>
+      <emu-grammar>FunctionDeclaration : `function` BindingIdentifier `(` FormalParameters `)` `{` FunctionBody `}`</emu-grammar>
+      <emu-alg>
+        1. Return the BoundNames of |BindingIdentifier|.
+      </emu-alg>
+      <emu-grammar>FunctionDeclaration : `function` `(` FormalParameters `)` `{` FunctionBody `}`</emu-grammar>
+      <emu-alg>
+        1. Return « *"\*default\*"* ».
+      </emu-alg>
+      <emu-grammar>FormalParameters : [empty]</emu-grammar>
+      <emu-alg>
+        1. Return a new empty List.
+      </emu-alg>
+      <emu-grammar>FormalParameters : FormalParameterList `,` FunctionRestParameter</emu-grammar>
+      <emu-alg>
+        1. Let _names1_ be BoundNames of |FormalParameterList|.
+        1. Let _names2_ be BoundNames of |FunctionRestParameter|.
+        1. Return the list-concatenation of _names1_ and _names2_.
+      </emu-alg>
+      <emu-grammar>FormalParameterList : FormalParameterList `,` FormalParameter</emu-grammar>
+      <emu-alg>
+        1. Let _names1_ be BoundNames of |FormalParameterList|.
+        1. Let _names2_ be BoundNames of |FormalParameter|.
+        1. Return the list-concatenation of _names1_ and _names2_.
+      </emu-alg>
+      <emu-grammar>ArrowParameters : CoverParenthesizedExpressionAndArrowParameterList</emu-grammar>
+      <emu-alg>
+        1. Let _formals_ be the |ArrowFormalParameters| that is covered by |CoverParenthesizedExpressionAndArrowParameterList|.
+        1. Return the BoundNames of _formals_.
+      </emu-alg>
+      <emu-grammar>GeneratorDeclaration : `function` `*` BindingIdentifier `(` FormalParameters `)` `{` GeneratorBody `}`</emu-grammar>
+      <emu-alg>
+        1. Return the BoundNames of |BindingIdentifier|.
+      </emu-alg>
+      <emu-grammar>GeneratorDeclaration : `function` `*` `(` FormalParameters `)` `{` GeneratorBody `}`</emu-grammar>
+      <emu-alg>
+        1. Return « *"\*default\*"* ».
+      </emu-alg>
+      <emu-grammar>AsyncGeneratorDeclaration : `async` `function` `*` BindingIdentifier `(` FormalParameters `)` `{` AsyncGeneratorBody `}`</emu-grammar>
+      <emu-alg>
+        1. Return the BoundNames of |BindingIdentifier|.
+      </emu-alg>
+      <emu-grammar>AsyncGeneratorDeclaration : `async` `function` `*` `(` FormalParameters `)` `{` AsyncGeneratorBody `}`</emu-grammar>
+      <emu-alg>
+        1. Return « *"\*default\*"* ».
+      </emu-alg>
+      <emu-grammar>ClassDeclaration : `class` BindingIdentifier ClassTail</emu-grammar>
+      <emu-alg>
+        1. Return the BoundNames of |BindingIdentifier|.
+      </emu-alg>
+      <emu-grammar>ClassDeclaration : `class` ClassTail</emu-grammar>
+      <emu-alg>
+        1. Return « *"\*default\*"* ».
+      </emu-alg>
+      <emu-grammar>
+        AsyncFunctionDeclaration : `async` `function` BindingIdentifier `(` FormalParameters `)` `{` AsyncFunctionBody `}`
+      </emu-grammar>
+      <emu-alg>
+        1. Return the BoundNames of |BindingIdentifier|.
+      </emu-alg>
+      <emu-grammar>
+        AsyncFunctionDeclaration : `async` `function` `(` FormalParameters `)` `{` AsyncFunctionBody `}`
+      </emu-grammar>
+      <emu-alg>
+        1. Return « *"\*default\*"* ».
+      </emu-alg>
+      <emu-grammar>
+        CoverCallExpressionAndAsyncArrowHead : MemberExpression Arguments
+      </emu-grammar>
+      <emu-alg>
+        1. Let _head_ be the |AsyncArrowHead| that is covered by |CoverCallExpressionAndAsyncArrowHead|.
+        1. Return the BoundNames of _head_.
+      </emu-alg>
+      <emu-grammar>ImportDeclaration : `import` ImportClause FromClause `;`</emu-grammar>
+      <emu-alg>
+        1. Return the BoundNames of |ImportClause|.
+      </emu-alg>
+      <emu-grammar>ImportDeclaration : `import` ModuleSpecifier `;`</emu-grammar>
+      <emu-alg>
+        1. Return a new empty List.
+      </emu-alg>
+      <emu-grammar>ImportClause : ImportedDefaultBinding `,` NameSpaceImport</emu-grammar>
+      <emu-alg>
+        1. Let _names1_ be the BoundNames of |ImportedDefaultBinding|.
+        1. Let _names2_ be the BoundNames of |NameSpaceImport|.
+        1. Return the list-concatenation of _names1_ and _names2_.
+      </emu-alg>
+      <emu-grammar>ImportClause : ImportedDefaultBinding `,` NamedImports</emu-grammar>
+      <emu-alg>
+        1. Let _names1_ be the BoundNames of |ImportedDefaultBinding|.
+        1. Let _names2_ be the BoundNames of |NamedImports|.
+        1. Return the list-concatenation of _names1_ and _names2_.
+      </emu-alg>
+      <emu-grammar>NamedImports : `{` `}`</emu-grammar>
+      <emu-alg>
+        1. Return a new empty List.
+      </emu-alg>
+      <emu-grammar>ImportsList : ImportsList `,` ImportSpecifier</emu-grammar>
+      <emu-alg>
+        1. Let _names1_ be the BoundNames of |ImportsList|.
+        1. Let _names2_ be the BoundNames of |ImportSpecifier|.
+        1. Return the list-concatenation of _names1_ and _names2_.
+      </emu-alg>
+      <emu-grammar>ImportSpecifier : ModuleExportName `as` ImportedBinding</emu-grammar>
+      <emu-alg>
+        1. Return the BoundNames of |ImportedBinding|.
+      </emu-alg>
+      <emu-grammar>
+        ExportDeclaration :
+          `export` ExportFromClause FromClause `;`
+          `export` NamedExports `;`
+      </emu-grammar>
+      <emu-alg>
+        1. Return a new empty List.
+      </emu-alg>
+      <emu-grammar>ExportDeclaration : `export` VariableStatement</emu-grammar>
+      <emu-alg>
+        1. Return the BoundNames of |VariableStatement|.
+      </emu-alg>
+      <emu-grammar>ExportDeclaration : `export` Declaration</emu-grammar>
+      <emu-alg>
+        1. Return the BoundNames of |Declaration|.
+      </emu-alg>
+      <emu-grammar>ExportDeclaration : `export` `default` HoistableDeclaration</emu-grammar>
+      <emu-alg>
+        1. Let _declarationNames_ be the BoundNames of |HoistableDeclaration|.
+        1. If _declarationNames_ does not include the element *"\*default\*"*, append *"\*default\*"* to _declarationNames_.
+        1. Return _declarationNames_.
+      </emu-alg>
+      <emu-grammar>ExportDeclaration : `export` `default` ClassDeclaration</emu-grammar>
+      <emu-alg>
+        1. Let _declarationNames_ be the BoundNames of |ClassDeclaration|.
+        1. If _declarationNames_ does not include the element *"\*default\*"*, append *"\*default\*"* to _declarationNames_.
+        1. Return _declarationNames_.
+      </emu-alg>
+      <emu-grammar>ExportDeclaration : `export` `default` AssignmentExpression `;`</emu-grammar>
+      <emu-alg>
+        1. Return « *"\*default\*"* ».
+      </emu-alg>
+    </emu-clause>
+
+  </emu-clause>
+
+  <emu-clause id="sec-syntax-directed-operations-miscellaneous">
+    <h1>Miscellaneous</h1>
+
+    <emu-clause id="sec-runtime-semantics-bindinginitialization" oldids="sec-identifiers-runtime-semantics-bindinginitialization,sec-destructuring-binding-patterns-runtime-semantics-bindinginitialization" type="sdo">
+      <h1>
+        Runtime Semantics: BindingInitialization (
+          _value_: an ECMAScript language value,
+          _environment_: an Environment Record or *undefined*,
+        ): either a normal completion containing ~unused~ or an abrupt completion
+      </h1>
+      <dl class="header">
+      </dl>
+      <emu-note>
+        <p>*undefined* is passed for _environment_ to indicate that a PutValue operation should be used to assign the initialization value. This is the case for `var` statements and formal parameter lists of some non-strict functions (See <emu-xref href="#sec-functiondeclarationinstantiation"></emu-xref>). In those cases a lexical binding is hoisted and preinitialized prior to evaluation of its initializer.</p>
+      </emu-note>
+      <emu-grammar>BindingIdentifier : Identifier</emu-grammar>
+      <emu-alg>
+        1. Let _name_ be StringValue of |Identifier|.
+        1. Return ? InitializeBoundName(_name_, _value_, _environment_).
+      </emu-alg>
+      <emu-grammar>BindingIdentifier : `yield`</emu-grammar>
+      <emu-alg>
+        1. Return ? InitializeBoundName(*"yield"*, _value_, _environment_).
+      </emu-alg>
+      <emu-grammar>BindingIdentifier : `await`</emu-grammar>
+      <emu-alg>
+        1. Return ? InitializeBoundName(*"await"*, _value_, _environment_).
+      </emu-alg>
+      <emu-grammar>BindingPattern : ObjectBindingPattern</emu-grammar>
+      <emu-alg>
+        1. Perform ? RequireObjectCoercible(_value_).
+        1. Return ? BindingInitialization of |ObjectBindingPattern| with arguments _value_ and _environment_.
+      </emu-alg>
+      <emu-grammar>BindingPattern : ArrayBindingPattern</emu-grammar>
+      <emu-alg>
+        1. Let _iteratorRecord_ be ? GetIterator(_value_, ~sync~).
+        1. Let _result_ be Completion(IteratorBindingInitialization of |ArrayBindingPattern| with arguments _iteratorRecord_ and _environment_).
+        1. If _iteratorRecord_.[[Done]] is *false*, return ? IteratorClose(_iteratorRecord_, _result_).
+        1. Return ? _result_.
+      </emu-alg>
+      <ins class="block">
+      <emu-grammar>
+        ExtractorBindingPattern :
+          ExtractorMemberExpression `(` Elision? BindingRestElement? `)`
+          ExtractorMemberExpression `(` BindingElementList `)`
+          ExtractorMemberExpression `(` BindingElementList `,` Elision? BindingRestElement? `)`
+      </emu-grammar>
+      <emu-alg>
+        1. Let _expr_ be the |LeftHandSideExpression| that is covered by |ExtractorMemberExpression|.
+        1. Let _ref_ be ? Evaluation of _expr_.
+        1. Let _extractor_ be ? GetValue(_ref_).
+        1. If _ref_ is a Reference Record and IsPropertyReference(_ref_) is *true*, let _receiver_ be GetThisValue(_ref_).
+        1. Else, Let _receiver_ be *null*.
+        1. Let _obj_ be ? InvokeCustomMatcherOrThrow(_extractor_, _value_, _receiver_).
+        1. Let _iteratorRecord_ be ? GetIterator(_obj_, ~sync~).
+        1. Let _result_ be ? IteratorBindingInitialization of this |ExtractorBindingPattern| with arguments _iteratorRecord_ and _environment_.
+        1. If _iteratorRecord_.[[Done]] is *false*, return ? IteratorClose(_iteratorRecord_, _result_).
+        1. Return ? _result_.
+      </emu-alg>
+      <emu-note type="editor">
+        <p>Draft Note: _receiver_ is part of the Pattern Matching proposal but does not have consensus in the Pattern Matching champion group yet.</p>
+      </emu-note>
+      </ins>
+      <emu-grammar>ObjectBindingPattern : `{` `}`</emu-grammar>
+      <emu-alg>
+        1. Return ~unused~.
+      </emu-alg>
+      <emu-grammar>
+        ObjectBindingPattern :
+          `{` BindingPropertyList `}`
+          `{` BindingPropertyList `,` `}`
+      </emu-grammar>
+      <emu-alg>
+        1. Perform ? PropertyBindingInitialization of |BindingPropertyList| with arguments _value_ and _environment_.
+        1. Return ~unused~.
+      </emu-alg>
+      <emu-grammar>ObjectBindingPattern : `{` BindingRestProperty `}`</emu-grammar>
+      <emu-alg>
+        1. Let _excludedNames_ be a new empty List.
+        1. Return ? RestBindingInitialization of |BindingRestProperty| with arguments _value_, _environment_, and _excludedNames_.
+      </emu-alg>
+      <emu-grammar>ObjectBindingPattern : `{` BindingPropertyList `,` BindingRestProperty `}`</emu-grammar>
+      <emu-alg>
+        1. Let _excludedNames_ be ? PropertyBindingInitialization of |BindingPropertyList| with arguments _value_ and _environment_.
+        1. Return ? RestBindingInitialization of |BindingRestProperty| with arguments _value_, _environment_, and _excludedNames_.
+      </emu-alg>
+
+      <ins class="block">
+      <emu-clause id="sec-invokecustommatcherorthrow" type="abstract operation">
+        <h1>
+          <ins>
+          InvokeCustomMatcherOrThrow (
+            _matcher_: an ECMAScript language value,
+            _subject_: an ECMAScript language value,
+            _receiver_: an ECMAScript language value,
+          ): either a normal completion containing an Object, or a throw completion
+          </ins>
+        </h1>
+        <dl class="header"></dl>
+        <emu-alg>
+          1. If _matcher_ is not an Object, throw a *TypeError* exception.
+          1. Let _f_ be ? GetMethod(_matcher_, @@customMatcher).
+          1. If _f_ is *undefined*, throw a *TypeError* exception.
+          1. Let _result_ be ? Call(_f_, _matcher_, « _subject_, `"list"`, _receiver_ »).
+          1. If _result_ is not an Object, throw a *TypeError* exception.
+          1. Let _iteratorRecord_ be ? GetIterator(_result_, ~SYNC~).
+          1. Return _iteratorRecord_.
+        </emu-alg>
+        <emu-note type="editor">
+          <p>Draft Note: The InvokeCustomMatcherOrThrow abstract operation is derived from <a href="https://tc39.es/proposal-pattern-matching/#sec-invoke-custom-matcher">InvokeCustomMatcher</a> in the Pattern Matching proposal.</p>
+        </emu-note>
+        <emu-note type="editor">
+          <p>Draft Note: The value `"list"` is related to two different modes (`"boolean"` and `"list"`) supported by custom matchers in the Pattern Matching proposal and is provided here to satisfy cross-cutting concerns between the two proposals.</p>
+        </emu-note>
+        <emu-note type="editor">
+          <p>Draft Note: The _receiver_ parameter is not a consensus in the Pattern Matching champion group yet. This design is to keep the `this` value when calling the custom matchers. Not everyone in the champion group agrees we need to keep the `this` value.</p>
+        </emu-note>
+        <emu-note type="editor">
+          <p>Draft Note: This proposal currently uses iterators for destructuring, but may choose to use Array objects explicitly in the future due to performance concerns related to iterators.</p>
+        </emu-note>
+      </emu-clause>
+      </ins>
+    </emu-clause>
+
+    <emu-clause id="sec-runtime-semantics-iteratorbindinginitialization" oldids="sec-destructuring-binding-patterns-runtime-semantics-iteratorbindinginitialization,sec-function-definitions-runtime-semantics-iteratorbindinginitialization,sec-arrow-function-definitions-runtime-semantics-iteratorbindinginitialization,sec-async-arrow-function-definitions-IteratorBindingInitialization" type="sdo">
+      <h1>
+        Runtime Semantics: IteratorBindingInitialization (
+          _iteratorRecord_: an Iterator Record,
+          _environment_: an Environment Record or *undefined*,
+        ): either a normal completion containing ~unused~ or an abrupt completion
+      </h1>
+      <dl class="header">
+      </dl>
+      <emu-note>
+        <p>When *undefined* is passed for _environment_ it indicates that a PutValue operation should be used to assign the initialization value. This is the case for formal parameter lists of non-strict functions. In that case the formal parameter bindings are preinitialized in order to deal with the possibility of multiple parameters with the same name.</p>
+      </emu-note>
+      <emu-grammar>
+        ArrayBindingPattern : `[` `]`
+        <ins class="block">ExtractorBindingPattern : ExtractorMemberExpression `(` `)`</ins>
+      </emu-grammar>
+      <emu-alg>
+        1. Return ~unused~.
+      </emu-alg>
+      <emu-grammar>
+        ArrayBindingPattern : `[` Elision `]`
+        <ins class="block">ExtractorBindingPattern : ExtractorMemberExpression `(` Elision `)`</ins>
+      </emu-grammar>
+      <emu-alg>
+        1. Return ? IteratorDestructuringAssignmentEvaluation of |Elision| with argument _iteratorRecord_.
+      </emu-alg>
+      <emu-grammar>
+        ArrayBindingPattern : `[` Elision? BindingRestElement `]`
+        <ins class="block">ExtractorBindingPattern : ExtractorMemberExpression `(` Elision? BindingRestElement `)`</ins>
+      </emu-grammar>
+      <emu-alg>
+        1. If |Elision| is present, then
+          1. Perform ? IteratorDestructuringAssignmentEvaluation of |Elision| with argument _iteratorRecord_.
+        1. Return ? IteratorBindingInitialization of |BindingRestElement| with arguments _iteratorRecord_ and _environment_.
+      </emu-alg>
+      <emu-grammar>
+        ArrayBindingPattern : `[` BindingElementList `,` Elision `]`
+        <ins class="block">ExtractorBindingPattern : ExtractorMemberExpression `(` BindingElementList `,` Elision `)`</ins>
+      </emu-grammar>
+      <emu-alg>
+        1. Perform ? IteratorBindingInitialization of |BindingElementList| with arguments _iteratorRecord_ and _environment_.
+        1. Return ? IteratorDestructuringAssignmentEvaluation of |Elision| with argument _iteratorRecord_.
+      </emu-alg>
+      <emu-grammar>
+        ArrayBindingPattern : `[` BindingElementList `,` Elision? BindingRestElement `]`
+        <ins class="block">ExtractorBindingPattern : ExtractorMemberExpression `(` BindingElementList `,` Elision? BindingRestElement `)`</ins>
+      </emu-grammar>
+      <emu-alg>
+        1. Perform ? IteratorBindingInitialization of |BindingElementList| with arguments _iteratorRecord_ and _environment_.
+        1. If |Elision| is present, then
+          1. Perform ? IteratorDestructuringAssignmentEvaluation of |Elision| with argument _iteratorRecord_.
+        1. Return ? IteratorBindingInitialization of |BindingRestElement| with arguments _iteratorRecord_ and _environment_.
+      </emu-alg>
+      <emu-grammar>BindingElementList : BindingElementList `,` BindingElisionElement</emu-grammar>
+      <emu-alg>
+        1. Perform ? IteratorBindingInitialization of |BindingElementList| with arguments _iteratorRecord_ and _environment_.
+        1. Return ? IteratorBindingInitialization of |BindingElisionElement| with arguments _iteratorRecord_ and _environment_.
+      </emu-alg>
+      <emu-grammar>BindingElisionElement : Elision BindingElement</emu-grammar>
+      <emu-alg>
+        1. Perform ? IteratorDestructuringAssignmentEvaluation of |Elision| with argument _iteratorRecord_.
+        1. Return ? IteratorBindingInitialization of |BindingElement| with arguments _iteratorRecord_ and _environment_.
+      </emu-alg>
+      <emu-grammar>SingleNameBinding : BindingIdentifier Initializer?</emu-grammar>
+      <emu-alg>
+        1. Let _bindingId_ be StringValue of |BindingIdentifier|.
+        1. Let _lhs_ be ? ResolveBinding(_bindingId_, _environment_).
+        1. Let _v_ be *undefined*.
+        1. If _iteratorRecord_.[[Done]] is *false*, then
+          1. Let _next_ be ? IteratorStepValue(_iteratorRecord_).
+          1. If _next_ is not ~done~, then
+            1. Set _v_ to _next_.
+        1. If |Initializer| is present and _v_ is *undefined*, then
+          1. If IsAnonymousFunctionDefinition(|Initializer|) is *true*, then
+            1. Set _v_ to ? NamedEvaluation of |Initializer| with argument _bindingId_.
+          1. Else,
+            1. Let _defaultValue_ be ? Evaluation of |Initializer|.
+            1. Set _v_ to ? GetValue(_defaultValue_).
+        1. If _environment_ is *undefined*, return ? PutValue(_lhs_, _v_).
+        1. Return ? InitializeReferencedBinding(_lhs_, _v_).
+      </emu-alg>
+      <emu-grammar>BindingElement : BindingPattern Initializer?</emu-grammar>
+      <emu-alg>
+        1. Let _v_ be *undefined*.
+        1. If _iteratorRecord_.[[Done]] is *false*, then
+          1. Let _next_ be ? IteratorStepValue(_iteratorRecord_).
+          1. If _next_ is not ~done~, then
+            1. Set _v_ to _next_.
+        1. If |Initializer| is present and _v_ is *undefined*, then
+          1. Let _defaultValue_ be ? Evaluation of |Initializer|.
+          1. Set _v_ to ? GetValue(_defaultValue_).
+        1. Return ? BindingInitialization of |BindingPattern| with arguments _v_ and _environment_.
+      </emu-alg>
+      <emu-grammar>BindingRestElement : `...` BindingIdentifier</emu-grammar>
+      <emu-alg>
+        1. Let _lhs_ be ? ResolveBinding(StringValue of |BindingIdentifier|, _environment_).
+        1. Let _A_ be ! ArrayCreate(0).
+        1. Let _n_ be 0.
+        1. Repeat,
+          1. Let _next_ be ~done~.
+          1. If _iteratorRecord_.[[Done]] is *false*, then
+            1. Set _next_ to ? IteratorStepValue(_iteratorRecord_).
+          1. If _next_ is ~done~, then
+            1. If _environment_ is *undefined*, return ? PutValue(_lhs_, _A_).
+            1. Return ? InitializeReferencedBinding(_lhs_, _A_).
+          1. Perform ! CreateDataPropertyOrThrow(_A_, ! ToString(𝔽(_n_)), _next_).
+          1. Set _n_ to _n_ + 1.
+      </emu-alg>
+      <emu-grammar>BindingRestElement : `...` BindingPattern</emu-grammar>
+      <emu-alg>
+        1. Let _A_ be ! ArrayCreate(0).
+        1. Let _n_ be 0.
+        1. Repeat,
+          1. Let _next_ be ~done~.
+          1. If _iteratorRecord_.[[Done]] is *false*, then
+            1. Set _next_ to ? IteratorStepValue(_iteratorRecord_).
+          1. If _next_ is ~done~, then
+            1. Return ? BindingInitialization of |BindingPattern| with arguments _A_ and _environment_.
+          1. Perform ! CreateDataPropertyOrThrow(_A_, ! ToString(𝔽(_n_)), _next_).
+          1. Set _n_ to _n_ + 1.
+      </emu-alg>
+      <emu-grammar>FormalParameters : [empty]</emu-grammar>
+      <emu-alg>
+        1. Return ~unused~.
+      </emu-alg>
+      <emu-grammar>FormalParameters : FormalParameterList `,` FunctionRestParameter</emu-grammar>
+      <emu-alg>
+        1. Perform ? IteratorBindingInitialization of |FormalParameterList| with arguments _iteratorRecord_ and _environment_.
+        1. Return ? IteratorBindingInitialization of |FunctionRestParameter| with arguments _iteratorRecord_ and _environment_.
+      </emu-alg>
+      <emu-grammar>FormalParameterList : FormalParameterList `,` FormalParameter</emu-grammar>
+      <emu-alg>
+        1. Perform ? IteratorBindingInitialization of |FormalParameterList| with arguments _iteratorRecord_ and _environment_.
+        1. Return ? IteratorBindingInitialization of |FormalParameter| with arguments _iteratorRecord_ and _environment_.
+      </emu-alg>
+      <emu-grammar>ArrowParameters : BindingIdentifier</emu-grammar>
+      <emu-alg>
+        1. Let _v_ be *undefined*.
+        1. Assert: _iteratorRecord_.[[Done]] is *false*.
+        1. Let _next_ be ? IteratorStepValue(_iteratorRecord_).
+        1. If _next_ is not ~done~, then
+          1. Set _v_ to _next_.
+        1. Return ? BindingInitialization of |BindingIdentifier| with arguments _v_ and _environment_.
+      </emu-alg>
+      <emu-grammar>ArrowParameters : CoverParenthesizedExpressionAndArrowParameterList</emu-grammar>
+      <emu-alg>
+        1. Let _formals_ be the |ArrowFormalParameters| that is covered by |CoverParenthesizedExpressionAndArrowParameterList|.
+        1. Return ? IteratorBindingInitialization of _formals_ with arguments _iteratorRecord_ and _environment_.
+      </emu-alg>
+      <emu-grammar>
+        AsyncArrowBindingIdentifier : BindingIdentifier
+      </emu-grammar>
+      <emu-alg>
+        1. Let _v_ be *undefined*.
+        1. Assert: _iteratorRecord_.[[Done]] is *false*.
+        1. Let _next_ be ? IteratorStepValue(_iteratorRecord_).
+        1. If _next_ is not ~done~, then
+          1. Set _v_ to _next_.
+        1. Return ? BindingInitialization of |BindingIdentifier| with arguments _v_ and _environment_.
+      </emu-alg>
+    </emu-clause>
+
+  </emu-clause>
+</emu-clause>
+
+<emu-clause id="sec-ecmascript-language-expressions">
+  <h1>ECMAScript Language: Expressions</h1>
+  <emu-clause id="sec-left-hand-side-expressions">
+    <h1>Left-Hand-Side Expressions</h1>
+    <h2>Syntax</h2>
+    <emu-grammar type="definition">
+      MemberExpression[Yield, Await] :
+        PrimaryExpression[?Yield, ?Await]
+        MemberExpression[?Yield, ?Await] `[` Expression[+In, ?Yield, ?Await] `]`
+        MemberExpression[?Yield, ?Await] `.` IdentifierName
+        MemberExpression[?Yield, ?Await] TemplateLiteral[?Yield, ?Await, +Tagged]
+        SuperProperty[?Yield, ?Await]
+        MetaProperty
+        `new` MemberExpression[?Yield, ?Await] Arguments[?Yield, ?Await]
+        MemberExpression[?Yield, ?Await] `.` PrivateIdentifier
+
+      SuperProperty[Yield, Await] :
+        `super` `[` Expression[+In, ?Yield, ?Await] `]`
+        `super` `.` IdentifierName
+
+      MetaProperty :
+        NewTarget
+        ImportMeta
+
+      NewTarget :
+        `new` `.` `target`
+
+      ImportMeta :
+        `import` `.` `meta`
+
+      NewExpression[Yield, Await] :
+        MemberExpression[?Yield, ?Await]
+        `new` NewExpression[?Yield, ?Await]
+
+      CallExpression[Yield, Await] :
+        CoverCallExpressionAndAsyncArrowHead[?Yield, ?Await] #callcover
+        SuperCall[?Yield, ?Await]
+        ImportCall[?Yield, ?Await]
+        <del>CallExpression[?Yield, ?Await] Arguments[?Yield, ?Await]</del>
+        <ins>FunctionCall[?Yield, ?Await]</ins>
+        CallExpression[?Yield, ?Await] `[` Expression[+In, ?Yield, ?Await] `]`
+        CallExpression[?Yield, ?Await] `.` IdentifierName
+        CallExpression[?Yield, ?Await] TemplateLiteral[?Yield, ?Await, +Tagged]
+        CallExpression[?Yield, ?Await] `.` PrivateIdentifier
+
+      <ins class="block">
+      FunctionCall[Yield, Await] :
+        CallExpression[?Yield, ?Await] Arguments[?Yield, ?Await]
+      </ins>
+
+      SuperCall[Yield, Await] :
+        `super` Arguments[?Yield, ?Await]
+
+      ImportCall[Yield, Await] :
+        `import` `(` AssignmentExpression[+In, ?Yield, ?Await] `)`
+
+      Arguments[Yield, Await] :
+        `(` `)`
+        `(` ArgumentList[?Yield, ?Await] `)`
+        `(` ArgumentList[?Yield, ?Await] `,` `)`
+
+      ArgumentList[Yield, Await] :
+        AssignmentExpression[+In, ?Yield, ?Await]
+        `...` AssignmentExpression[+In, ?Yield, ?Await]
+        ArgumentList[?Yield, ?Await] `,` AssignmentExpression[+In, ?Yield, ?Await]
+        ArgumentList[?Yield, ?Await] `,` `...` AssignmentExpression[+In, ?Yield, ?Await]
+
+      OptionalExpression[Yield, Await] :
+        MemberExpression[?Yield, ?Await] OptionalChain[?Yield, ?Await]
+        CallExpression[?Yield, ?Await] OptionalChain[?Yield, ?Await]
+        OptionalExpression[?Yield, ?Await] OptionalChain[?Yield, ?Await]
+
+      OptionalChain[Yield, Await] :
+        `?.` Arguments[?Yield, ?Await]
+        `?.` `[` Expression[+In, ?Yield, ?Await] `]`
+        `?.` IdentifierName
+        `?.` TemplateLiteral[?Yield, ?Await, +Tagged]
+        `?.` PrivateIdentifier
+        OptionalChain[?Yield, ?Await] Arguments[?Yield, ?Await]
+        OptionalChain[?Yield, ?Await] `[` Expression[+In, ?Yield, ?Await] `]`
+        OptionalChain[?Yield, ?Await] `.` IdentifierName
+        OptionalChain[?Yield, ?Await] TemplateLiteral[?Yield, ?Await, +Tagged]
+        OptionalChain[?Yield, ?Await] `.` PrivateIdentifier
+
+      LeftHandSideExpression[Yield, Await] :
+        NewExpression[?Yield, ?Await]
+        CallExpression[?Yield, ?Await]
+        OptionalExpression[?Yield, ?Await]
+    </emu-grammar>
+    <h2>Supplemental Syntax</h2>
+    <p>
+      When processing an instance of the production<br>
+      <emu-grammar>CallExpression : CoverCallExpressionAndAsyncArrowHead</emu-grammar><br>
+      the interpretation of |CoverCallExpressionAndAsyncArrowHead| is refined using the following grammar:
+    </p>
+    <emu-grammar type="definition">
+      CallMemberExpression[Yield, Await] :
+        MemberExpression[?Yield, ?Await] Arguments[?Yield, ?Await]
+    </emu-grammar>
+
+    <emu-clause id="sec-function-calls">
+      <h1>Function Calls</h1>
+
+      <emu-clause id="sec-function-calls-runtime-semantics-evaluation" type="sdo">
+        <h1>Runtime Semantics: Evaluation</h1>
+        <emu-grammar>CallExpression : CoverCallExpressionAndAsyncArrowHead</emu-grammar>
+        <emu-alg>
+          1. Let _expr_ be the |CallMemberExpression| that is covered by |CoverCallExpressionAndAsyncArrowHead|.
+          1. Let _memberExpr_ be the |MemberExpression| of _expr_.
+          1. Let _arguments_ be the |Arguments| of _expr_.
+          1. Let _ref_ be ? Evaluation of _memberExpr_.
+          1. Let _func_ be ? GetValue(_ref_).
+          1. If _ref_ is a Reference Record, IsPropertyReference(_ref_) is *false*, and _ref_.[[ReferencedName]] is *"eval"*, then
+            1. If SameValue(_func_, %eval%) is *true*, then
+              1. Let _argList_ be ? ArgumentListEvaluation of _arguments_.
+              1. If _argList_ has no elements, return *undefined*.
+              1. Let _evalArg_ be the first element of _argList_.
+              1. If IsStrict(this |CallExpression|) is *true*, let _strictCaller_ be *true*. Otherwise let _strictCaller_ be *false*.
+              1. [id="step-callexpression-evaluation-direct-eval"] Return ? PerformEval(_evalArg_, _strictCaller_, *true*).
+          1. Let _thisCall_ be this |CallExpression|.
+          1. Let _tailCall_ be IsInTailPosition(_thisCall_).
+          1. Return ? EvaluateCall(_func_, _ref_, _arguments_, _tailCall_).
+        </emu-alg>
+        <p>A |CallExpression| evaluation that executes step <emu-xref href="#step-callexpression-evaluation-direct-eval"></emu-xref> is a <dfn variants="direct evals">direct eval</dfn>.</p>
+        <emu-grammar>
+          <del>CallExpression : CallExpression Arguments</del>
+          <ins>FunctionCall : CallExpression Arguments</ins>
+        </emu-grammar>
+        <emu-alg>
+          1. Let _ref_ be ? Evaluation of |CallExpression|.
+          1. Let _func_ be ? GetValue(_ref_).
+          1. Let _thisCall_ be this |CallExpression|.
+          1. Let _tailCall_ be IsInTailPosition(_thisCall_).
+          1. Return ? EvaluateCall(_func_, _ref_, |Arguments|, _tailCall_).
+        </emu-alg>
+      </emu-clause>
+    </emu-clause>
+  </emu-clause>
+
+  <emu-clause id="sec-assignment-operators">
+    <h1>Assignment Operators</h1>
+
+    <emu-clause id="sec-assignment-operators-runtime-semantics-evaluation" type="sdo">
+      <h1>Runtime Semantics: Evaluation</h1>
+      <emu-grammar>AssignmentExpression : LeftHandSideExpression `=` AssignmentExpression</emu-grammar>
+      <emu-alg>
+        1. If |LeftHandSideExpression| is neither an |ObjectLiteral|<del> nor</del><ins>,</ins> an |ArrayLiteral|<ins>, a |FunctionCall|, nor a |CallMemberExpression|</ins>, then
+          1. Let _lref_ be ? Evaluation of |LeftHandSideExpression|.
+          1. If IsAnonymousFunctionDefinition(|AssignmentExpression|) and IsIdentifierRef of |LeftHandSideExpression| are both *true*, then
+            1. Let _rval_ be ? NamedEvaluation of |AssignmentExpression| with argument _lref_.[[ReferencedName]].
+          1. Else,
+            1. Let _rref_ be ? Evaluation of |AssignmentExpression|.
+            1. Let _rval_ be ? GetValue(_rref_).
+          1. [id="step-assignmentexpression-evaluation-simple-putvalue"] Perform ? PutValue(_lref_, _rval_).
+          1. Return _rval_.
+        1. Let _assignmentPattern_ be the |AssignmentPattern| that is covered by |LeftHandSideExpression|.
+        1. Let _rref_ be ? Evaluation of |AssignmentExpression|.
+        1. Let _rval_ be ? GetValue(_rref_).
+        1. Perform ? DestructuringAssignmentEvaluation of _assignmentPattern_ with argument _rval_.
+        1. Return _rval_.
+      </emu-alg>
+      <emu-grammar>AssignmentExpression : LeftHandSideExpression AssignmentOperator AssignmentExpression</emu-grammar>
+      <emu-alg>
+        1. Let _lref_ be ? Evaluation of |LeftHandSideExpression|.
+        1. [id="step-assignmentexpression-evaluation-compound-getvalue"] Let _lval_ be ? GetValue(_lref_).
+        1. Let _rref_ be ? Evaluation of |AssignmentExpression|.
+        1. Let _rval_ be ? GetValue(_rref_).
+        1. Let _assignmentOpText_ be the source text matched by |AssignmentOperator|.
+        1. Let _opText_ be the sequence of Unicode code points associated with _assignmentOpText_ in the following table:
+          <figure>
+            <!-- emu-format ignore -->
+            <table class="lightweight-table">
+              <tr><th> _assignmentOpText_ </th><th> _opText_       </th></tr>
+              <tr><td> `**=`              </td><td> `**`           </td></tr>
+              <tr><td> `*=`               </td><td> `*`            </td></tr>
+              <tr><td> `/=`               </td><td> `/`            </td></tr>
+              <tr><td> `%=`               </td><td> `%`            </td></tr>
+              <tr><td> `+=`               </td><td> `+`            </td></tr>
+              <tr><td> `-=`               </td><td> `-`            </td></tr>
+              <tr><td> `&lt;&lt;=`        </td><td> `&lt;&lt;`     </td></tr>
+              <tr><td> `&gt;&gt;=`        </td><td> `&gt;&gt;`     </td></tr>
+              <tr><td> `&gt;&gt;&gt;=`    </td><td> `&gt;&gt;&gt;` </td></tr>
+              <tr><td> `&amp;=`           </td><td> `&amp;`        </td></tr>
+              <tr><td> `^=`               </td><td> `^`            </td></tr>
+              <tr><td> `|=`               </td><td> `|`            </td></tr>
+            </table>
+          </figure>
+        1. Let _r_ be ? ApplyStringOrNumericBinaryOperator(_lval_, _opText_, _rval_).
+        1. [id="step-assignmentexpression-evaluation-compound-putvalue"] Perform ? PutValue(_lref_, _r_).
+        1. Return _r_.
+      </emu-alg>
+      <emu-grammar>AssignmentExpression : LeftHandSideExpression `&amp;&amp;=` AssignmentExpression</emu-grammar>
+      <emu-alg>
+        1. Let _lref_ be ? Evaluation of |LeftHandSideExpression|.
+        1. [id="step-assignmentexpression-evaluation-lgcl-and-getvalue"] Let _lval_ be ? GetValue(_lref_).
+        1. Let _lbool_ be ToBoolean(_lval_).
+        1. If _lbool_ is *false*, return _lval_.
+        1. If IsAnonymousFunctionDefinition(|AssignmentExpression|) is *true* and IsIdentifierRef of |LeftHandSideExpression| is *true*, then
+          1. Let _rval_ be ? NamedEvaluation of |AssignmentExpression| with argument _lref_.[[ReferencedName]].
+        1. Else,
+          1. Let _rref_ be ? Evaluation of |AssignmentExpression|.
+          1. Let _rval_ be ? GetValue(_rref_).
+        1. [id="step-assignmentexpression-evaluation-lgcl-and-putvalue"] Perform ? PutValue(_lref_, _rval_).
+        1. Return _rval_.
+      </emu-alg>
+      <emu-grammar>AssignmentExpression : LeftHandSideExpression `||=` AssignmentExpression</emu-grammar>
+      <emu-alg>
+        1. Let _lref_ be ? Evaluation of |LeftHandSideExpression|.
+        1. [id="step-assignmentexpression-evaluation-lgcl-or-getvalue"] Let _lval_ be ? GetValue(_lref_).
+        1. Let _lbool_ be ToBoolean(_lval_).
+        1. If _lbool_ is *true*, return _lval_.
+        1. If IsAnonymousFunctionDefinition(|AssignmentExpression|) is *true* and IsIdentifierRef of |LeftHandSideExpression| is *true*, then
+          1. Let _rval_ be ? NamedEvaluation of |AssignmentExpression| with argument _lref_.[[ReferencedName]].
+        1. Else,
+          1. Let _rref_ be ? Evaluation of |AssignmentExpression|.
+          1. Let _rval_ be ? GetValue(_rref_).
+        1. [id="step-assignmentexpression-evaluation-lgcl-or-putvalue"] Perform ? PutValue(_lref_, _rval_).
+        1. Return _rval_.
+      </emu-alg>
+      <emu-grammar>AssignmentExpression : LeftHandSideExpression `??=` AssignmentExpression</emu-grammar>
+      <emu-alg>
+        1. Let _lref_ be ? Evaluation of |LeftHandSideExpression|.
+        1. [id="step-assignmentexpression-evaluation-lgcl-nullish-getvalue"] Let _lval_ be ? GetValue(_lref_).
+        1. If _lval_ is neither *undefined* nor *null*, return _lval_.
+        1. If IsAnonymousFunctionDefinition(|AssignmentExpression|) is *true* and IsIdentifierRef of |LeftHandSideExpression| is *true*, then
+          1. Let _rval_ be ? NamedEvaluation of |AssignmentExpression| with argument _lref_.[[ReferencedName]].
+        1. Else,
+          1. Let _rref_ be ? Evaluation of |AssignmentExpression|.
+          1. Let _rval_ be ? GetValue(_rref_).
+        1. [id="step-assignmentexpression-evaluation-lgcl-nullish-putvalue"] Perform ? PutValue(_lref_, _rval_).
+        1. Return _rval_.
+      </emu-alg>
+      <emu-note>
+        <p>When this expression occurs within strict mode code, it is a runtime error if _lref_ in step <emu-xref href="#step-assignmentexpression-evaluation-simple-putvalue"></emu-xref>, <emu-xref href="#step-assignmentexpression-evaluation-compound-getvalue"></emu-xref>, <emu-xref href="#step-assignmentexpression-evaluation-lgcl-and-getvalue"></emu-xref>, <emu-xref href="#step-assignmentexpression-evaluation-lgcl-or-getvalue"></emu-xref>, <emu-xref href="#step-assignmentexpression-evaluation-lgcl-nullish-getvalue"></emu-xref> is an unresolvable reference. If it is, a *ReferenceError* exception is thrown. Additionally, it is a runtime error if the _lref_ in step <emu-xref href="#step-assignmentexpression-evaluation-compound-putvalue"></emu-xref>, <emu-xref href="#step-assignmentexpression-evaluation-lgcl-and-putvalue"></emu-xref>, <emu-xref href="#step-assignmentexpression-evaluation-lgcl-or-putvalue"></emu-xref>, <emu-xref href="#step-assignmentexpression-evaluation-lgcl-nullish-putvalue"></emu-xref> is a reference to a data property with the attribute value { [[Writable]]: *false* }, to an accessor property with the attribute value { [[Set]]: *undefined* }, or to a non-existent property of an object for which the IsExtensible predicate returns the value *false*. In these cases a *TypeError* exception is thrown.</p>
+      </emu-note>
+    </emu-clause>
+
+    <emu-clause id="sec-destructuring-assignment">
+      <h1>Destructuring Assignment</h1>
+      <h2>Supplemental Syntax</h2>
+      <p>
+        In certain circumstances when processing an instance of the production<br>
+        <emu-grammar>AssignmentExpression : LeftHandSideExpression `=` AssignmentExpression</emu-grammar><br>
+        the interpretation of |LeftHandSideExpression| is refined using the following grammar:
+      </p>
+      <emu-grammar type="definition">
+        AssignmentPattern[Yield, Await] :
+          ObjectAssignmentPattern[?Yield, ?Await]
+          ArrayAssignmentPattern[?Yield, ?Await]
+          <ins>ExtractorAssignmentPattern[?Yield, ?Await]</ins>
+
+        ObjectAssignmentPattern[Yield, Await] :
+          `{` `}`
+          `{` AssignmentRestProperty[?Yield, ?Await] `}`
+          `{` AssignmentPropertyList[?Yield, ?Await] `}`
+          `{` AssignmentPropertyList[?Yield, ?Await] `,` AssignmentRestProperty[?Yield, ?Await]? `}`
+
+        ArrayAssignmentPattern[Yield, Await] :
+          `[` Elision? AssignmentRestElement[?Yield, ?Await]? `]`
+          `[` AssignmentElementList[?Yield, ?Await] `]`
+          `[` AssignmentElementList[?Yield, ?Await] `,` Elision? AssignmentRestElement[?Yield, ?Await]? `]`
+
+        <ins class="block">
+        ExtractorAssignmentPattern[Yield, Await] :
+          ExtractorMemberExpression[?Yield, ?Await] `(` Elision? AssignmentRestElement[?Yield, ?Await]? `)`
+          ExtractorMemberExpression[?Yield, ?Await] `(` AssignmentElementList[?Yield, ?Await] `)`
+          ExtractorMemberExpression[?Yield, ?Await] `(` AssignmentElementList[?Yield, ?Await] `,` Elision? AssignmentRestElement[?Yield, ?Await]? `)`
+        </ins>
+
+        AssignmentRestProperty[Yield, Await] :
+          `...` DestructuringAssignmentTarget[?Yield, ?Await]
+
+        AssignmentPropertyList[Yield, Await] :
+          AssignmentProperty[?Yield, ?Await]
+          AssignmentPropertyList[?Yield, ?Await] `,` AssignmentProperty[?Yield, ?Await]
+
+        AssignmentElementList[Yield, Await] :
+          AssignmentElisionElement[?Yield, ?Await]
+          AssignmentElementList[?Yield, ?Await] `,` AssignmentElisionElement[?Yield, ?Await]
+
+        AssignmentElisionElement[Yield, Await] :
+          Elision? AssignmentElement[?Yield, ?Await]
+
+        AssignmentProperty[Yield, Await] :
+          IdentifierReference[?Yield, ?Await] Initializer[+In, ?Yield, ?Await]?
+          PropertyName[?Yield, ?Await] `:` AssignmentElement[?Yield, ?Await]
+
+        AssignmentElement[Yield, Await] :
+          DestructuringAssignmentTarget[?Yield, ?Await] Initializer[+In, ?Yield, ?Await]?
+
+        AssignmentRestElement[Yield, Await] :
+          `...` DestructuringAssignmentTarget[?Yield, ?Await]
+
+        DestructuringAssignmentTarget[Yield, Await] :
+          LeftHandSideExpression[?Yield, ?Await]
+      </emu-grammar>
+
+      <emu-clause id="sec-destructuring-assignment-static-semantics-early-errors">
+        <h1>Static Semantics: Early Errors</h1>
+        <emu-grammar>AssignmentProperty : IdentifierReference Initializer?</emu-grammar>
+        <ul>
+          <li>
+            It is a Syntax Error if AssignmentTargetType of |IdentifierReference| is not ~simple~.
+          </li>
+        </ul>
+        <emu-grammar>AssignmentRestProperty : `...` DestructuringAssignmentTarget</emu-grammar>
+        <ul>
+          <li>
+            It is a Syntax Error if |DestructuringAssignmentTarget| is either an |ArrayLiteral| or an |ObjectLiteral|.
+          </li>
+        </ul>
+        <emu-grammar>DestructuringAssignmentTarget : LeftHandSideExpression</emu-grammar>
+        <ul>
+          <li>
+            If |LeftHandSideExpression| is either an |ObjectLiteral|<del> or</del><ins>,</ins> an |ArrayLiteral|<ins>, a |FunctionCall|, or a |CallMemberExpression|</ins>, |LeftHandSideExpression| must cover an |AssignmentPattern|.
+          </li>
+          <li>
+            If |LeftHandSideExpression| is neither an |ObjectLiteral|<del> nor</del><ins>,</ins> an |ArrayLiteral|<ins>, a |FunctionCall|, nor a |CallMemberExpression|</ins>, it is a Syntax Error if AssignmentTargetType of |LeftHandSideExpression| is not ~simple~.
+          </li>
+        </ul>
+      </emu-clause>
+
+      <emu-clause id="sec-runtime-semantics-destructuringassignmentevaluation" type="sdo">
+        <h1>
+          Runtime Semantics: DestructuringAssignmentEvaluation (
+            _value_: an ECMAScript language value,
+          ): either a normal completion containing ~unused~ or an abrupt completion
+        </h1>
+        <dl class="header">
+        </dl>
+        <emu-grammar>ObjectAssignmentPattern : `{` `}`</emu-grammar>
+        <emu-alg>
+          1. Perform ? RequireObjectCoercible(_value_).
+          1. Return ~unused~.
+        </emu-alg>
+        <emu-grammar>
+          ObjectAssignmentPattern :
+            `{` AssignmentPropertyList `}`
+            `{` AssignmentPropertyList `,` `}`
+        </emu-grammar>
+        <emu-alg>
+          1. Perform ? RequireObjectCoercible(_value_).
+          1. Perform ? PropertyDestructuringAssignmentEvaluation of |AssignmentPropertyList| with argument _value_.
+          1. Return ~unused~.
+        </emu-alg>
+        <emu-grammar>ObjectAssignmentPattern : `{` AssignmentRestProperty `}`</emu-grammar>
+        <emu-alg>
+          1. Perform ? RequireObjectCoercible(_value_).
+          1. Let _excludedNames_ be a new empty List.
+          1. Return ? RestDestructuringAssignmentEvaluation of |AssignmentRestProperty| with arguments _value_ and _excludedNames_.
+        </emu-alg>
+        <emu-grammar>ObjectAssignmentPattern : `{` AssignmentPropertyList `,` AssignmentRestProperty `}`</emu-grammar>
+        <emu-alg>
+          1. Perform ? RequireObjectCoercible(_value_).
+          1. Let _excludedNames_ be ? PropertyDestructuringAssignmentEvaluation of |AssignmentPropertyList| with argument _value_.
+          1. Return ? RestDestructuringAssignmentEvaluation of |AssignmentRestProperty| with arguments _value_ and _excludedNames_.
+        </emu-alg>
+        <emu-grammar>ArrayAssignmentPattern : `[` `]`</emu-grammar>
+        <emu-alg>
+          1. Let _iteratorRecord_ be ? GetIterator(_value_, ~sync~).
+          1. Return ? IteratorClose(_iteratorRecord_, NormalCompletion(~unused~)).
+        </emu-alg>
+        <emu-grammar>ArrayAssignmentPattern : `[` Elision `]`</emu-grammar>
+        <emu-alg>
+          1. Let _iteratorRecord_ be ? GetIterator(_value_, ~sync~).
+          1. Let _result_ be Completion(IteratorDestructuringAssignmentEvaluation of |Elision| with argument _iteratorRecord_).
+          1. If _iteratorRecord_.[[Done]] is *false*, return ? IteratorClose(_iteratorRecord_, _result_).
+          1. Return _result_.
+        </emu-alg>
+        <emu-grammar>ArrayAssignmentPattern : `[` Elision? AssignmentRestElement `]`</emu-grammar>
+        <emu-alg>
+          1. Let _iteratorRecord_ be ? GetIterator(_value_, ~sync~).
+          1. If |Elision| is present, then
+            1. Let _status_ be Completion(IteratorDestructuringAssignmentEvaluation of |Elision| with argument _iteratorRecord_).
+            1. If _status_ is an abrupt completion, then
+              1. Assert: _iteratorRecord_.[[Done]] is *true*.
+              1. Return ? _status_.
+          1. Let _result_ be Completion(IteratorDestructuringAssignmentEvaluation of |AssignmentRestElement| with argument _iteratorRecord_).
+          1. If _iteratorRecord_.[[Done]] is *false*, return ? IteratorClose(_iteratorRecord_, _result_).
+          1. Return _result_.
+        </emu-alg>
+        <emu-grammar>ArrayAssignmentPattern : `[` AssignmentElementList `]`</emu-grammar>
+        <emu-alg>
+          1. Let _iteratorRecord_ be ? GetIterator(_value_, ~sync~).
+          1. Let _result_ be Completion(IteratorDestructuringAssignmentEvaluation of |AssignmentElementList| with argument _iteratorRecord_).
+          1. If _iteratorRecord_.[[Done]] is *false*, return ? IteratorClose(_iteratorRecord_, _result_).
+          1. Return _result_.
+        </emu-alg>
+        <emu-grammar>ArrayAssignmentPattern : `[` AssignmentElementList `,` Elision? AssignmentRestElement? `]`</emu-grammar>
+        <emu-alg>
+          1. Let _iteratorRecord_ be ? GetIterator(_value_, ~sync~).
+          1. Let _status_ be Completion(IteratorDestructuringAssignmentEvaluation of |AssignmentElementList| with argument _iteratorRecord_).
+          1. If _status_ is an abrupt completion, then
+            1. If _iteratorRecord_.[[Done]] is *false*, return ? IteratorClose(_iteratorRecord_, _status_).
+            1. Return ? _status_.
+          1. If |Elision| is present, then
+            1. Set _status_ to Completion(IteratorDestructuringAssignmentEvaluation of |Elision| with argument _iteratorRecord_).
+            1. If _status_ is an abrupt completion, then
+              1. Assert: _iteratorRecord_.[[Done]] is *true*.
+              1. Return ? _status_.
+          1. If |AssignmentRestElement| is present, then
+            1. Set _status_ to Completion(IteratorDestructuringAssignmentEvaluation of |AssignmentRestElement| with argument _iteratorRecord_).
+          1. If _iteratorRecord_.[[Done]] is *false*, return ? IteratorClose(_iteratorRecord_, _status_).
+          1. Return ? _status_.
+        </emu-alg>
+        <ins class="block">
+        <emu-grammar>ExtractorAssignmentPattern : ExtractorMemberExpression `(` `)`</emu-grammar>
+        <emu-alg>
+          1. Let _expr_ be the |LeftHandSideExpression| that is covered by |ExtractorMemberExpression|.
+          1. Let _ref_ be ? Evaluation of _expr_.
+          1. Let _extractor_ be ? GetValue(_ref_).
+          1. If _ref_ is a Reference Record and IsPropertyReference(_ref_) is *true*, let _receiver_ be GetThisValue(_ref_).
+          1. Else, Let _receiver_ be *null*.
+          1. Let _obj_ be ? InvokeCustomMatcherOrThrow(_extractor_, _value_, _receiver_).
+          1. Let _iteratorRecord_ be ? GetIterator(_obj_, ~sync~).
+          1. Return ? IteratorClose(_iteratorRecord_, NormalCompletion(~unused~)).
+        </emu-alg>
+        <emu-grammar>ExtractorAssignmentPattern : ExtractorMemberExpression `(` Elision `)`</emu-grammar>
+        <emu-alg>
+          1. Let _expr_ be the |LeftHandSideExpression| that is covered by |ExtractorMemberExpression|.
+          1. Let _ref_ be ? Evaluation of _expr_.
+          1. Let _extractor_ be ? GetValue(_ref_).
+          1. If _ref_ is a Reference Record and IsPropertyReference(_ref_) is *true*, let _receiver_ be GetThisValue(_ref_).
+          1. Else, Let _receiver_ be *null*.
+          1. Let _obj_ be ? InvokeCustomMatcherOrThrow(_extractor_, _value_, _receiver_).
+          1. Let _iteratorRecord_ be ? GetIterator(_obj_, ~sync~).
+          1. Let _result_ be Completion(IteratorDestructuringAssignmentEvaluation of |Elision| with argument _iteratorRecord_).
+          1. If _iteratorRecord_.[[Done]] is *false*, return ? IteratorClose(_iteratorRecord_, _result_).
+          1. Return _result_.
+        </emu-alg>
+        <emu-grammar>ExtractorAssignmentPattern : ExtractorMemberExpression `(` Elision? AssignmentRestElement `)`</emu-grammar>
+        <emu-alg>
+          1. Let _expr_ be the |LeftHandSideExpression| that is covered by |ExtractorMemberExpression|.
+          1. Let _ref_ be ? Evaluation of _expr_.
+          1. Let _extractor_ be ? GetValue(_ref_).
+          1. If _ref_ is a Reference Record and IsPropertyReference(_ref_) is *true*, let _receiver_ be GetThisValue(_ref_).
+          1. Else, Let _receiver_ be *null*.
+          1. Let _obj_ be ? InvokeCustomMatcherOrThrow(_extractor_, _value_, _receiver_).
+          1. Let _iteratorRecord_ be ? GetIterator(_obj_, ~sync~).
+          1. If |Elision| is present, then
+            1. Let _status_ be Completion(IteratorDestructuringAssignmentEvaluation of |Elision| with argument _iteratorRecord_).
+            1. If _status_ is an abrupt completion, then
+              1. Assert: _iteratorRecord_.[[Done]] is *true*.
+              1. Return ? _status_.
+          1. Let _result_ be Completion(IteratorDestructuringAssignmentEvaluation of |AssignmentRestElement| with argument _iteratorRecord_).
+          1. If _iteratorRecord_.[[Done]] is *false*, return ? IteratorClose(_iteratorRecord_, _result_).
+          1. Return _result_.
+        </emu-alg>
+        <emu-grammar>ExtractorAssignmentPattern : ExtractorMemberExpression `(` AssignmentElementList `)`</emu-grammar>
+        <emu-alg>
+          1. Let _expr_ be the |LeftHandSideExpression| that is covered by |ExtractorMemberExpression|.
+          1. Let _ref_ be ? Evaluation of _expr_.
+          1. Let _extractor_ be ? GetValue(_ref_).
+          1. If _ref_ is a Reference Record and IsPropertyReference(_ref_) is *true*, let _receiver_ be GetThisValue(_ref_).
+          1. Else, Let _receiver_ be *null*.
+          1. Let _obj_ be ? InvokeCustomMatcherOrThrow(_extractor_, _value_, _receiver_).
+          1. Let _iteratorRecord_ be ? GetIterator(_obj_, ~sync~).
+          1. Let _result_ be Completion(IteratorDestructuringAssignmentEvaluation of |AssignmentElementList| with argument _iteratorRecord_).
+          1. If _iteratorRecord_.[[Done]] is *false*, return ? IteratorClose(_iteratorRecord_, _result_).
+          1. Return _result_.
+        </emu-alg>
+        <emu-grammar>ExtractorAssignmentPattern : ExtractorMemberExpression `(` AssignmentElementList `,` Elision? AssignmentRestElement? `)`</emu-grammar>
+        <emu-alg>
+          1. Let _expr_ be the |LeftHandSideExpression| that is covered by |ExtractorMemberExpression|.
+          1. Let _ref_ be ? Evaluation of _expr_.
+          1. Let _extractor_ be ? GetValue(_ref_).
+          1. If _ref_ is a Reference Record and IsPropertyReference(_ref_) is *true*, let _receiver_ be GetThisValue(_ref_).
+          1. Else, Let _receiver_ be *null*.
+          1. Let _obj_ be ? InvokeCustomMatcherOrThrow(_extractor_, _value_, _receiver_).
+          1. Let _iteratorRecord_ be ? GetIterator(_obj_, ~sync~).
+          1. Let _status_ be Completion(IteratorDestructuringAssignmentEvaluation of |AssignmentElementList| with argument _iteratorRecord_).
+          1. If _status_ is an abrupt completion, then
+            1. If _iteratorRecord_.[[Done]] is *false*, return ? IteratorClose(_iteratorRecord_, _status_).
+            1. Return ? _status_.
+          1. If |Elision| is present, then
+            1. Set _status_ to Completion(IteratorDestructuringAssignmentEvaluation of |Elision| with argument _iteratorRecord_).
+            1. If _status_ is an abrupt completion, then
+              1. Assert: _iteratorRecord_.[[Done]] is *true*.
+              1. Return ? _status_.
+          1. If |AssignmentRestElement| is present, then
+            1. Set _status_ to Completion(IteratorDestructuringAssignmentEvaluation of |AssignmentRestElement| with argument _iteratorRecord_).
+          1. If _iteratorRecord_.[[Done]] is *false*, return ? IteratorClose(_iteratorRecord_, _status_).
+          1. Return ? _status_.
+        </emu-alg>
+        <emu-note type="editor">
+          <p>Draft Note: _receiver_ is part of the Pattern Matching proposal but does not have consensus in the Pattern Matching champion group yet.</p>
+        </emu-note>
+        </ins>
+      </emu-clause>
+    </emu-clause>
+  </emu-clause>
+</emu-clause>
+
+<emu-clause id="sec-ecmascript-language-statements-and-declarations">
+  <h1>ECMAScript Language: Statements and Declarations</h1>
+
+  <emu-clause id="sec-declarations-and-the-variable-statement">
+    <h1>Declarations and the Variable Statement</h1>
+
+    <emu-clause id="sec-destructuring-binding-patterns">
+      <h1>Destructuring Binding Patterns</h1>
+      <h2>Syntax</h2>
+      <emu-grammar type="definition">
+        BindingPattern[Yield, Await] :
+          ObjectBindingPattern[?Yield, ?Await]
+          ArrayBindingPattern[?Yield, ?Await]
+          <ins>ExtractorBindingPattern[?Yield, ?Await]</ins>
+
+        ObjectBindingPattern[Yield, Await] :
+          `{` `}`
+          `{` BindingRestProperty[?Yield, ?Await] `}`
+          `{` BindingPropertyList[?Yield, ?Await] `}`
+          `{` BindingPropertyList[?Yield, ?Await] `,` BindingRestProperty[?Yield, ?Await]? `}`
+
+        ArrayBindingPattern[Yield, Await] :
+          `[` Elision? BindingRestElement[?Yield, ?Await]? `]`
+          `[` BindingElementList[?Yield, ?Await] `]`
+          `[` BindingElementList[?Yield, ?Await] `,` Elision? BindingRestElement[?Yield, ?Await]? `]`
+        </emu-grammar>
+        <ins class="block">
+        <emu-grammar type="definition">
+        ExtractorBindingPattern[Yield, Await] :
+          ExtractorMemberExpression[?Yield, ?Await] `(` Elision? BindingRestElement[?Yield, ?Await]? `)`
+          ExtractorMemberExpression[?Yield, ?Await] `(` BindingElementList[?Yield, ?Await] `)`
+          ExtractorMemberExpression[?Yield, ?Await] `(` BindingElementList[?Yield, ?Await] `,` Elision? BindingRestElement[?Yield, ?Await]? `)`
+
+        ExtractorMemberExpression[Yield, Await] :
+          `this`
+          MetaProperty
+          IdentifierReference[?Yield, ?Await]
+          `super` `.` IdentifierName
+          ExtractorMemberExpression[?Yield, ?Await] `.` IdentifierName
+          ExtractorMemberExpression[?Yield, ?Await] `.` PrivateIdentifier
+          ExtractorMemberExpression[?Yield, ?Await] `[` Expression[+In, ?Yield, ?Await] `]`
+        </emu-grammar>
+        <emu-note type="editor">
+          <p>Draft Note: The |ExtractorMemberExpression| production is equivalent to <a href="https://tc39.es/proposal-pattern-matching/#prod-PatternMatchingMemberExpression">PatternMatchingMemberExpression</a> in the <a href="https://github.com/tc39/proposal-pattern-matching">Pattern Matching</a> proposal.</p>
+        </emu-note>
+        </ins>
+        <emu-grammar type="definition">
+        BindingRestProperty[Yield, Await] :
+          `...` BindingIdentifier[?Yield, ?Await]
+
+        BindingPropertyList[Yield, Await] :
+          BindingProperty[?Yield, ?Await]
+          BindingPropertyList[?Yield, ?Await] `,` BindingProperty[?Yield, ?Await]
+
+        BindingElementList[Yield, Await] :
+          BindingElisionElement[?Yield, ?Await]
+          BindingElementList[?Yield, ?Await] `,` BindingElisionElement[?Yield, ?Await]
+
+        BindingElisionElement[Yield, Await] :
+          Elision? BindingElement[?Yield, ?Await]
+
+        BindingProperty[Yield, Await] :
+          SingleNameBinding[?Yield, ?Await]
+          PropertyName[?Yield, ?Await] `:` BindingElement[?Yield, ?Await]
+
+        BindingElement[Yield, Await] :
+          SingleNameBinding[?Yield, ?Await]
+          BindingPattern[?Yield, ?Await] Initializer[+In, ?Yield, ?Await]?
+
+        SingleNameBinding[Yield, Await] :
+          BindingIdentifier[?Yield, ?Await] Initializer[+In, ?Yield, ?Await]?
+
+        BindingRestElement[Yield, Await] :
+          `...` BindingIdentifier[?Yield, ?Await]
+          `...` BindingPattern[?Yield, ?Await]
+      </emu-grammar>
+    </emu-clause>
+  </emu-clause>
+</emu-clause>
