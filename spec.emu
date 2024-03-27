@@ -396,8 +396,7 @@ contributors: Ron Buckton, Ecma International
         1. Let _extractor_ be ? GetValue(_ref_).
         1. If _ref_ is a Reference Record and IsPropertyReference(_ref_) is *true*, let _receiver_ be GetThisValue(_ref_).
         1. Else, Let _receiver_ be *null*.
-        1. Let _obj_ be ? InvokeCustomMatcherOrThrow(_extractor_, _value_, _receiver_).
-        1. Let _iteratorRecord_ be ? GetIterator(_obj_, ~sync~).
+        1. Let _iteratorRecord_ be ? InvokeCustomMatcherOrThrow(_extractor_, _value_, _receiver_).
         1. Let _result_ be ? IteratorBindingInitialization of this |ExtractorBindingPattern| with arguments _iteratorRecord_ and _environment_.
         1. If _iteratorRecord_.[[Done]] is *false*, return ? IteratorClose(_iteratorRecord_, _result_).
         1. Return ? _result_.
