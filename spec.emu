@@ -123,12 +123,6 @@ contributors: Ron Buckton, Ecma International
       <emu-alg>
         1. Return the BoundNames of |BindingPattern|.
       </emu-alg>
-      <ins class="block">
-      <emu-grammar>BindingPattern : ExtractorMemberExpression ExtractorBindingPattern</emu-grammar>
-      <emu-alg>
-        1. Return the BoundNames of |ExtractorBindingPattern|.
-      </emu-alg>
-      </ins>
       <emu-grammar>ObjectBindingPattern : `{` `}`</emu-grammar>
       <emu-alg>
         1. Return a new empty List.
