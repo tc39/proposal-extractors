@@ -441,7 +441,7 @@ contributors: Ron Buckton, Ecma International
           1. If _f_ is *undefined*, throw a *TypeError* exception.
           1. Let _result_ be ? Call(_f_, _matcher_, « _subject_, `"list"`, _receiver_ »).
           1. If _result_ is not an Object, throw a *TypeError* exception.
-          1. Let _iteratorRecord_ be ? GetIterator(_result_, ~SYNC~).
+          1. Let _iteratorRecord_ be ? GetIterator(_result_, ~sync~).
           1. Return _iteratorRecord_.
         </emu-alg>
         <emu-note type="editor">
