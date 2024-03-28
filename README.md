@@ -25,8 +25,8 @@ Foo(Bar(y)) = x;            // ..
 X.Foo(y) = x;               // qualified names (i.e., a.b.c)
 ```
 
-In addition, this would leverage the new `Symbol.matcher` built-in symbol added by the Pattern Matching proposal. When
-destructuring using the new form, the `Symbol.matcher` method would be called and its result would be destructured instead.
+In addition, this would leverage the new `Symbol.customMatcher` built-in symbol added by the Pattern Matching proposal. When
+destructuring using the new form, the `Symbol.customMatcher` method would be called and its result would be destructured instead.
 
 ## Status
 
@@ -81,12 +81,11 @@ With _Extractors_, such validation and transformation logic can be encapsulated 
 
 ```js
 const InstantExtractor = {
-  [Symbol.matcher]: value =>
-    value instanceof Temporal.Instant ? { matched: true, value: [value] } :
-    value instanceof Date ? { matched: true, value: [Temporal.Instant.fromEpochMilliseconds(value.getTime())] } :
-    typeof value === "string" ? { matched: true, value: [Temporal.Instant.from(value)] } :
-    { matched: false };
-  }
+  [Symbol.customMatcher]: value =>
+    value instanceof Temporal.Instant ? [value] :
+    value instanceof Date ? [Temporal.Instant.fromEpochMilliseconds(value.getTime())] :
+    typeof value === "string" ? [Temporal.Instant.from(value)] :
+    false
 };
 
 class Book {
@@ -168,17 +167,16 @@ _BindingPattern_ and _AssignmentPattern_ to allow for the evaluation of user-def
 transformation.
 
 Extractors perform array destructuring on a successful match result, starting with a reference to a value in scope
-using a _QualifiedName_, which is essentially an _IdentifierReference_ (i.e., `Point`, `InstantExtractor`, etc.) or a 
-dotted-name (i.e., `Option.Some`, `Message.Move`, etc.).
+using an _ExtractorMemberExpression_, which is essentially an _IdentifierReference_ (i.e., `Point`, `InstantExtractor`,
+etc.) or a dotted-name (i.e., `Option.Some`, `Message.Move`, etc.).
 
-When an Extractor is evaluated during destructuring, its _QualifiedName_ is evaluated, and that evaluated result's
-`[Symbol.matcher]()` method is invoked with the current value to be destructured, returning a _Match Result_ object like
-`{ matched: boolean, value: object }`.
+When an Extractor is evaluated during destructuring, its _ExtractorMemberExpression_ is evaluated, and that evaluated
+result's `[Symbol.customMatcher]()` method is invoked with the current value to be destructured, returning an iterable
+object that indicates the match succeeded, and the extracted elements to use for further destructuring. For the purpose
+of destructuring, any other value will produce a *TypeError*. In the case of pattern matching, `true` and `false` are
+also valid return values.
 
-If `matched` is `true`, the `value` property is further destructured based on the type of Extractor that was defined. If
-`matched` is `false`, a *TypeError* is thrown.
-
-An _Extractor_ consists of a _QualifiedName_ followed by a parenthesized list of additional destructuring patterns:
+An _Extractor_ consists of an _ExtractorMemberExpression_ followed by a parenthesized list of additional destructuring patterns:
 
 ```js
 // binding pattern
@@ -238,7 +236,7 @@ const Message = {
         // 'match: "unary"' indicates that 'value' is the sole extracted value
         return { match: "unary", value: { x: value.#x, y: value.#y } };
       }
-      return { match: false };
+      return false;
     }
   }
 };
@@ -291,13 +289,16 @@ at this time.
 The examples in this section use a desugaring to explain the underlying semantics, given the following helper:
 
 ```js
-function %InvokeCustomMatcher%(val, matchable) {
-    // see https://tc39.es/proposal-pattern-matching/#sec-custom-matcher
-}
-
-function %InvokeCustomMatcherOrThrow%(val, matchable) {
-  const result = %InvokeCustomMatcher%(val, matchable);
-  if (result === ~not-matched~) {
+function %InvokeCustomMatcherOrThrow%(extractor, subject) {
+  if (typeof extractor !== "object" || extractor === null) {
+    throw new TypeError();
+  }
+  const f = extractor[Symbol.customMatcher];
+  if (typeof f !== "function") {
+    throw new TypeError();
+  }
+  const result = f.call(extractor, [subject, "list"]);
+  if (typeof result !== "object" || result === null) {
     throw new TypeError();
   }
   return result;
@@ -351,12 +352,12 @@ Given the following definition
 
 ```js
 const MapExtractor = {
-  [Symbol.matcher](map) {
+  [Symbol.customMatcher](map) {
     const obj = {};
     for (const [key, value] of map) {
       obj[typeof key === "symbol" ? key : `${key}`] = value;
     }
-    return { matched: true, value: [obj] };
+    return [obj];
   }
 };
 
@@ -382,14 +383,9 @@ const [{ a, b }] = %InvokeCustomMatcherOrThrow%(MapExtractor, _temp);
 
 ```js
 // potentially built-in as part of Pattern Matching
-RegExp.prototype[Symbol.matcher] = function (value) {
+RegExp.prototype[Symbol.customMatcher] = function (value) {
   const match = this.exec(value);
-  if (match === null) return { matched: false };
-
-  return {
-    matched: true,
-    value: match
-  }
+  return !!match && [match];
 };
 
 const IsoDate = /^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})$/;
@@ -418,254 +414,21 @@ const IsoDateTime({
 
 # Potential Grammar
 
-The grammar definition in this section is very early and subject to change.
-
-```diff grammarkdown
-+   QualifiedName[Yield, Await] :
-+       IdentifierReference[?Yield, ?Await]
-+       QualifiedName[?Yield, ?Await] `.` IdentifierName
-
-    BindingPattern[Yield, Await] :
-        ObjectBindingPattern[?Yield, ?Await]
-        ArrayBindingPattern[?Yield, ?Await]
-+       QualifiedName[?Yield, ?Await] ExtractorBindingPattern[?Yield, ?Await]
-
-+   ExtractorBindingPattern[Yield, Await] :
-+       `(` Elision? BindingRestElement[?Yield, ?Await]? `)`
-+       `(` BindingElementList[?Yield, ?Await] `)`
-+       `(` BindingElementList[?Yield, ?Await] `,` Elision? BindingRestElement[?Yield, ?Await]? `)`
-
-    AssignmentPattern[Yield, Await] :
-        ObjectAssignmentPattern[?Yield, ?Await]
-        ArrayAssignmentPattern[?Yield, ?Await]
-+       QualifiedName[?Yield, ?Await] ExtractorAssignmentPattern[?Yield, ?Await]
-
-+   ExtractorAssignmentPattern[Yield, Await] :
-+       `(` Elision? AssignmentRestElement[?Yield, ?Await]? `)`
-+       `(` AssignmentElementList[?Yield, ?Await] `)`
-+       `(` AssignmentElementList[?Yield, ?Await] `,` Elision? AssignmentRestElement[?Yield, ?Await]? `)`
-
-+   FunctionCall[Yield, Await] :
-+       CallExpression[?Yield, ?Await] Arguments[?Yield, ?Await]
-
-    CallExpression[Yield, Await] :
-        CoverCallExpressionAndAsyncArrowHead[?Yield, ?Await]
-        SuperCall[?Yield, ?Await]
-        ImportCall[?Yield, ?Await]
-+       FunctionCall[?Yield, ?Await]
--       CallExpression[?Yield, ?Await] Arguments[?Yield, ?Await]
-        CallExpression[?Yield, ?Await] `[` Expression[+In, ?Yield, ?Await] `]`
-        CallExpression[?Yield, ?Await] `.` IdentifierName
-        CallExpression[?Yield, ?Await] TemplateLiteral[?Yield, ?Await, +Tagged]
-        CallExpression[?Yield, ?Await] `.` PrivateIdentifier
-```
+For the proposed grammar, see [the specification text](https://tc39.es/proposal-extractors).
 
 # Potential Semantics
 
-The semantics in this section are very early and subject to change.
-
-## 8.5.2 &mdash; Runtime Semantics: BindingInitialization
-
-The syntax-directed operation BindingInitialization takes arguments _value_ and _environment_.
-
-```diff grammarkdown
-+   BindingPattern : QualifiedName ExtractorBindingPattern
-```
-
-1. <ins>Let _ref_ be the result of evaluating _QualifiedName_.</ins>
-1. <ins>Let _extractor_ be ? GetValue(_ref_).</ins>
-1. <ins>Let _obj_ be ? InvokeCustomMatcherOrThrow(_extractor_, _value_).</ins>
-1. <ins>Let _iteratorRecord_ be ? GetIterator(_obj_).</ins>
-1. <ins>Let _result_ be IteratorBindingInitialization of _ExtractorBindingPattern_ with arguments _iteratorRecord_ and _environment_.</ins>
-1. <ins>If _iteratorRecord_.\[\[Done]] is **false**, return ? IteratorClose(_iteratorRecord_, _result_).</ins>
-1. <ins>Return _result_.</ins>
-
-## 8.5.2.2 &mdash; <ins>Runtime Semantics: InvokeCustomMatcherOrThrow ( _val_, _matchable_ )</ins>
-
-1. <ins>Let _result_ be ? InvokeCustomMatcher(_val_, _matchable_).</ins>
-1. <ins>If _result_ is ~not-matched~, throw a **TypeError** exception.</ins>
-1. <ins>Return _result_.</ins>
-
-## 8.5.3 &mdash; Runtime Semantics: IteratorBindingInitialization
-
-The syntax-directed operation IteratorBindingInitialization takes arguments _iteratorRecord_ and _environment_.
-
-```diff grammarkdown
-    ArrayBindingPattern : `[` `]`
-+   ExtractorBindingPattern : `(` `)`
-```
-
-1. Return NormalCompletion(empty).
-
-```diff grammarkdown
-    ArrayBindingPattern : `[` Elision `]`
-+   ExtractorBindingPattern : `(` Elision `)`
-```
-
-1. Return the result of performing IteratorDestructuringAssignmentEvaluation of _Elision_ with _iteratorRecord_ as the argument.
-
-```diff grammarkdown
-    ArrayBindingPattern : `[` Elision? BindingRestElement `]`
-+   ExtractorBindingPattern : `(` Elision? BindingRestElement `)`
-```
-
-1. If _Elision_ is present, then
-    1. Perform ? IteratorDestructuringAssignmentEvaluation of _Elision_ with _iteratorRecord_ as the argument.
-1. Return the result of performing IteratorBindingInitialization for _BindingRestElement_ with _iteratorRecord_ and _environment_ as arguments.
-
-```diff grammarkdown
-    ArrayBindingPattern : `[` BindingElementList `,` Elision `]`
-+   ExtractorBindingPattern : `(` BindingElementList `,` Elision `)`
-```
-
-1. Perform ? IteratorBindingInitialization for _BindingElementList_ with _iteratorRecord_ and _environment_ as arguments.
-1. Return the result of performing IteratorDestructuringAssignmentEvaluation of _Elision_ with _iteratorRecord_ as the argument.
-
-```diff grammarkdown
-    ArrayBindingPattern : `[` BindingElementList `,` Elision? BindingRestElement `]`
-+   ExtractorBindingPattern : `(` BindingElementList `,` Elision? BindingRestElement `)`
-```
-
-1. Perform ? IteratorBindingInitialization for _BindingElementList_ with _iteratorRecord_ and _environment_ as arguments.
-1. If _Elision_ is present, then
-    1. Perform ? IteratorDestructuringAssignmentEvaluation of _Elision_ with _iteratorRecord_ as the argument.
-1. Return the result of performing IteratorBindingInitialization for _BindingRestElement_ with _iteratorRecord_ and _environment_ as arguments.
-
-## 13.15.1 &mdash; Static Semantics: Early Errors
-
-```diff grammarkdown
-    AssignmentExpression : LeftHandSideExpression = AssignmentExpression
-```
-
-If _LeftHandSideExpression_ is an _ObjectLiteral_<del> or</del><ins>,</ins> an _ArrayLiteral_<ins>, or a _FunctionCall_</ins> the following Early Error rules are applied:
-
-- It is a Syntax Error if _LeftHandSideExpression_ is not covering an _AssignmentPattern_.
-- All Early Error rules for _AssignmentPattern_ and its derived productions also apply to the _AssignmentPattern_ that is covered
-  by _LeftHandSideExpression_.
-
-If _LeftHandSideExpression_ is neither an _ObjectLiteral_<ins>,</ins> nor an _ArrayLiteral_<ins>, nor a _FunctionCall_</ins>, the following Early Error rule is applied:
-
-- It is a Syntax Error if AssignmentTargetType of _LeftHandSideExpression_ is not `simple`.
-
-```diff grammarkdown
-    AssignmentExpression :
-        LeftHandSideExpression AssignmentOperator AssignmentExpression
-        LeftHandSideExpression `&&=` AssignmentExpression
-        LeftHandSideExpression `||=` AssignmentExpression
-        LeftHandSideExpression `??=` AssignmentExpression
-```
-
-- It is a Syntax Error if AssignmentTargetType of _LeftHandSideExpression_ is not `simple`.
-
-## 13.15.2 &mdash; Runtime Semantics: Evaluation
-
-```diff grammarkdown
-    AssignmentExpression : LeftHandSideExpression `=` AssignmentExpression
-```
-
-1. If _LeftHandSideExpression_ is neither an _ObjectLiteral_<ins>,</ins> nor an ArrayLiteral<ins>, nor a _FunctionCall_</ins>, then
-    1. Let _lref_ be the result of evaluating _LeftHandSideExpression_.
-    1. ReturnIfAbrupt(_lref_).
-    1. If IsAnonymousFunctionDefinition(_AssignmentExpression_) and IsIdentifierRef of _LeftHandSideExpression_ are both **true**, then
-        1. Let _rval_ be NamedEvaluation of _AssignmentExpression_ with argument _lref_.\[\[ReferencedName]].
-    1. Else,
-        1. Let _rref_ be the result of evaluating _AssignmentExpression_.
-        1. Let _rval_ be ? GetValue(_rref_).
-    1. Perform ? PutValue(lref, _rval_).
-    1. Return _rval_.
-2. Let _assignmentPattern_ be the _AssignmentPattern_ that is covered by _LeftHandSideExpression_.
-3. Let _rref_ be the result of evaluating _AssignmentExpression_.
-4. Let _rval_ be ? GetValue(_rref_).
-5. Perform ? DestructuringAssignmentEvaluation of _assignmentPattern_ using _rval_ as the argument.
-6. Return _rval_.
-
-## 13.15.5.2 &mdash; Runtime Semantics: DestructuringAssignmentEvaluation
-
-The syntax-directed operation DestructuringAssignmentEvaluation takes argument _value_. It is defined piecewise over the following productions:
-
-```diff grammarkdown
-+   AssignmentPattern : QualifiedName ExtractorAssignmentPattern
-```
-
-1. <ins>Let _ref_ be the result of evaluating _QualifiedName_.</ins>
-1. <ins>Let _extractor_ be ? GetValue(_ref_).</ins>
-1. <ins>Let _obj_ be ? InvokeCustomMatcherOrThrow(_extractor_, _value_).</ins>
-1. <ins>Return the result of performing DestructuringAssignmentEvaluation of _ExtractorAssignmentPattern_ with argument _obj_.</ins>
-
-```diff grammarkdown
-    ArrayAssignmentPattern : `[` `]`
-+   ExtractorAssignmentPattern : `(` `)`
-```
-
-1. Let _iteratorRecord_ be ? GetIterator(_value_).
-1. Return ? IteratorClose(_iteratorRecord_, NormalCompletion(empty)).
-
-```diff grammarkdown
-    ArrayAssignmentPattern : `[` Elision `]`
-+   ExtractorAssignmentPattern : `(` Elision `)`
-```
-
-
-1. Let _iteratorRecord_ be ? GetIterator(value).
-1. Let _result_ be IteratorDestructuringAssignmentEvaluation of _Elision_ with argument _iteratorRecord_.
-1. If _iteratorRecord_.[[Done]] is false, return ? IteratorClose(_iteratorRecord_, _result_).
-1. Return _result_.
-
-```diff grammarkdown
-    ArrayAssignmentPattern : `[` Elision? AssignmentRestElement `]`
-+   ExtractorAssignmentPattern : `(` Elision? AssignmentRestElement `)`
-```
-
-1. Let _iteratorRecord_ be ? GetIterator(_value_).
-1. If _Elision_ is present, then
-    1. Let _status_ be IteratorDestructuringAssignmentEvaluation of _Elision_ with argument _iteratorRecord_.
-    1. If _status_ is an abrupt completion, then
-        1. Assert: _iteratorRecord_.[[Done]] is **true**.
-        1. Return Completion(_status_).
-1. Let _result_ be IteratorDestructuringAssignmentEvaluation of _AssignmentRestElement_ with argument _iteratorRecord_.
-1. If _iteratorRecord_.[[Done]] is **false**, return ? IteratorClose(_iteratorRecord_, result).
-1. Return result.
-
-```diff grammarkdown
-    ArrayAssignmentPattern : `[` AssignmentElementList `]`
-+   ExtractorAssignmentPattern : `(` AssignmentElementList `)`
-```
-
-1. Let _iteratorRecord_ be ? GetIterator(_value_).
-1. Let _result_ be IteratorDestructuringAssignmentEvaluation of _AssignmentElementList_ with argument _iteratorRecord_.
-1. If _iteratorRecord_.[[Done]] is **false**, return ? IteratorClose(_iteratorRecord_, _result_).
-1. Return _result_.
-
-```diff grammarkdown
-    ArrayAssignmentPattern : `[` AssignmentElementList `,` Elision? AssignmentRestElement? `]`
-+   ExtractorAssignmentPattern : `(` AssignmentElementList `,` Elision? AssignmentRestElement? `)`
-```
-
-1. Let _iteratorRecord_ be ? GetIterator(_value_).
-1. Let _status_ be IteratorDestructuringAssignmentEvaluation of _AssignmentElementList_ with argument _iteratorRecord_.
-1. If _status_ is an abrupt completion, then
-    1. If _iteratorRecord_.[[Done]] is **false**, return ? IteratorClose(_iteratorRecord_, _status_).
-    1. Return Completion(_status_).
-1. If _Elision_ is present, then
-    1. Set _status_ to the result of performing IteratorDestructuringAssignmentEvaluation of _Elision_ with _iteratorRecord_ as the argument.
-    1. If _status_ is an abrupt completion, then
-        1. Assert: _iteratorRecord_.[[Done]] is **true**.
-        1. Return Completion(_status_).
-1. If _AssignmentRestElement_ is present, then
-    1. Set _status_ to the result of performing IteratorDestructuringAssignmentEvaluation of _AssignmentRestElement_ with _iteratorRecord_ as the
-       argument.
-1. If _iteratorRecord_.[[Done]] is **false**, return ? IteratorClose(_iteratorRecord_, _status_).
-1. Return Completion(_status_).
+For the proposed semantics, see [the specification text](https://tc39.es/proposal-extractors).
 
 # API
 
 This proposal would adopt (and continue to align with) the behavior of _Custom Matchers_ from the Pattern Matching proposal:
 
-- A _Custom Matcher_ is a regular ECMAScript Object value with a `[Symbol.matcher]` method that accepts a single argument and
+- A _Custom Matcher_ is a regular ECMAScript Object value with a `[Symbol.customMatcher]` method that accepts a single argument and
   returns a _Match Result_.
 - A _Match Result_ is a regular ECMAScript Object value with a `matched` property whose value is a Boolean, and a `value` property
   whose value will be destructured by the relevant Extractor pattern.
-- `Symbol.matcher` is a built-in Symbol value.
+- `Symbol.customMatcher` is a built-in Symbol value.
 
 # Relation to Pattern Matching
 
@@ -778,7 +541,7 @@ The following is a high-level list of tasks to progress through each stage of th
 
 ### Stage 2 Entrance Criteria
 
-* [ ] [Initial specification text][Specification].
+* [x] [Initial specification text][Specification].
 * [ ] [Transpiler support][Transpiler] (_Optional_).
 
 ### Stage 3 Entrance Criteria
