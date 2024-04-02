@@ -286,6 +286,7 @@ at this time.
 
 # Examples
 
+<a name="extractor-destructuring"></a>
 The examples in this section use a desugaring to explain the underlying semantics, given the following helper:
 
 ```js
@@ -305,50 +306,245 @@ function %InvokeCustomMatcherOrThrow%(extractor, subject) {
 }
 ```
 
-## Extractor Destructuring
+## `const C(x) = subject`
+
+Given,
+
+```js
+class C {
+  #data;
+  constructor(data) {
+    this.#data = data;
+  }
+  [Symbol.customMatcher](subject) {
+    return #data in subject && [this.#data];
+  }
+}
+
+const subject = new C("data");
+
+const C(x) = subject;
+x; // "data"
+```
 
 The statement
 
 ```js
-const Foo(y) = x;
+const C(x) = subject;
 ```
 
-is approximately the same as the following transposed representation
+is approximately the same as the transposed representation
 
 ```js
-const [y] = %InvokeCustomMatcherOrThrow%(Foo, x);
+const [x] = %InvokeCustomMatcherOrThrow%(C, subject);
+```
+
+such that `x` results in the value `"data"`.
+
+## `const C(x, y) = subject`
+
+Given,
+
+```js
+class C {
+  #first;
+  #second;
+  constructor(first, second) {
+    this.#first = first;
+    this.#second = second;
+  }
+  [Symbol.customMatcher](subject) {
+    return #first in subject && [this.#first, this.#second];
+  }
+}
+
+const subject = new C(1, 2);
+
+const C(x, y) = subject;
+x; // 1
+y; // 2
 ```
 
 The statement
 
 ```js
-const Foo({y}) = x;
+const C(x, y) = subject;
 ```
 
-is approximately the same as the following transposed representation
+is approximately the same as the transposed representation
 
 ```js
-const [{y}] = %InvokeCustomMatcherOrThrow%(Foo, x);
+const [x, y] = %InvokeCustomMatcherOrThrow%(C, subject);
 ```
 
-## Nested Extractor Destructuring
+such that `x` and `y` result in the values `1` and `2`, respectively.
+
+## `const C(x, ...y) = subject`
+
+Given,
+
+```js
+class C {
+  #first;
+  #second;
+  #third;
+  constructor(first, second, third) {
+    this.#first = first;
+    this.#second = second;
+    this.#third = third;
+  }
+  [Symbol.customMatcher](subject) {
+    return #first in subject && [this.#first, this.#second, this.#third];
+  }
+}
+
+const subject = new C(1, 2, 3);
+
+const C(x, ...y) = subject;
+x; // 1
+y; // [2, 3]
+```
 
 The statement
 
 ```js
-const Foo(Bar(y)) = x;
+const C(x, ...y) = subject;
 ```
 
-is approximately the same as the following transposed representation
+is approximately the same as the transposed representation
 
 ```js
-const [_a] = %InvokeCustomMatcherOrThrow%(Foo, x);
-const [y] = %InvokeCustomMatcherOrThrow%(Bar, _a);
+const [x, ...y] = %InvokeCustomMatcherOrThrow%(C, subject);
 ```
+
+such that `x` and `y` result in the values `1` and `[2, 3]`, respectively.
+
+
+## `const C(x = -1, y) = subject`
+
+Given,
+
+```js
+class C {
+  #first;
+  #second;
+  constructor(first, second) {
+    this.#first = first;
+    this.#second = second;
+  }
+  [Symbol.customMatcher](subject) {
+    return #first in subject && [this.#first, this.#second];
+  }
+}
+
+const subject = new C(undefined, 2);
+
+const C(x = -1, y) = subject;
+x; // -1
+y; // 2
+```
+
+The statement
+
+```js
+const C(x = -1, y) = subject;
+```
+
+is approximately the same as the transposed representation
+
+```js
+const [x = -1, y] = %InvokeCustomMatcherOrThrow%(C, subject);
+```
+
+such that `x` and `y` result in the values `-1` and `2`, respectively.
+
+## `const C({ x }) = subject`
+
+Given,
+
+```js
+class C {
+  #data;
+  constructor(data) {
+    this.#data = data;
+  }
+  [Symbol.customMatcher](subject) {
+    return #data in subject && [this.#data];
+  }
+}
+
+const subject = new C({ x: 1, y: 2 });
+
+const C({ x, y }) = subject;
+x; // 1
+y; // 2
+```
+
+The statement
+
+```js
+const C({ x, y }) = subject;
+```
+
+is approximately the same as the transposed representation
+
+```js
+const [{ x, y }] = %InvokeCustomMatcherOrThrow%(C, subject);
+```
+
+such that `x` and `y` have the values `1` and `2`, respectively.
+
+## `const C(D(x)) = subject`
+
+Given,
+
+```js
+class C {
+  #data1;
+  constructor(data1) {
+    this.#data1 = data1;
+  }
+  [Symbol.customMatcher](subject) {
+    return #data1 in subject && [this.#data1];
+  }
+}
+
+class D {
+  #data2;
+  constructor(data2) {
+    this.#data2 = data2;
+  }
+  [Symbol.customMatcher](subject) {
+    return #data2 in subject && [this.#data2];
+  }
+}
+
+const subject = new C(D("data"));
+
+const C(D(x)) = subject;
+x; // "data"
+```
+
+The statement
+
+```js
+const C(D(x)) = subject;
+```
+
+is approximately the same as the transposed representation
+
+```js
+const [_a] = %InvokeCustomMatcherOrThrow%(C, subject);
+const [x] = %InvokeCustomMatcherOrThrow%(D, _a);
+```
+
+such that `x` results in the value `"data"`.
+
+
 
 ## Custom Logic During Destructuring
 
-Given the following definition
+Given,
 
 ```js
 const MapExtractor = {
@@ -364,6 +560,10 @@ const MapExtractor = {
 const obj = {
     map: new Map([["a", 1], ["b", 2]])
 };
+
+const { map: MapExtractor({ a, b }) } = obj;
+a; // 1
+b; // 2
 ```
 
 The statement
@@ -372,12 +572,14 @@ The statement
 const { map: MapExtractor({ a, b }) } = obj;
 ```
 
-is approximately the same as the following transposed representation
+is approximately the same as the transposed representation
 
 ```js
 const { map: _temp } = obj;
 const [{ a, b }] = %InvokeCustomMatcherOrThrow%(MapExtractor, _temp);
 ```
+
+such that `a` and `b` result in the values `1` and `2`, respectively.
 
 ## Regular Expressions
 
