@@ -81,11 +81,15 @@ With _Extractors_, such validation and transformation logic can be encapsulated 
 
 ```js
 const InstantExtractor = {
-  [Symbol.customMatcher]: value =>
-    value instanceof Temporal.Instant ? [value] :
-    value instanceof Date ? [Temporal.Instant.fromEpochMilliseconds(value.getTime())] :
-    typeof value === "string" ? [Temporal.Instant.from(value)] :
-    false
+  [Symbol.customMatcher](value) {
+    if (value instanceof Temporal.Instant) {
+      return [value];
+    } else if (value instanceof Date) {
+      return [Temporal.Instant.fromEpochMilliseconds(+value)];
+    } else if (typeof value === "string") {
+      return [Temporal.Instant.from(value)];
+    }
+  }
 };
 
 class Book {
@@ -290,7 +294,7 @@ at this time.
 The examples in this section use a desugaring to explain the underlying semantics, given the following helper:
 
 ```js
-function %InvokeCustomMatcherOrThrow%(extractor, subject) {
+function %InvokeCustomMatcherOrThrow%(extractor, subject, receiver) {
   if (typeof extractor !== "object" || extractor === null) {
     throw new TypeError();
   }
@@ -298,7 +302,7 @@ function %InvokeCustomMatcherOrThrow%(extractor, subject) {
   if (typeof f !== "function") {
     throw new TypeError();
   }
-  const result = f.call(extractor, [subject, "list"]);
+  const result = f.apply(extractor, [subject, "list", receiver]);
   if (typeof result !== "object" || result === null) {
     throw new TypeError();
   }
@@ -336,7 +340,7 @@ const C(x) = subject;
 is approximately the same as the transposed representation
 
 ```js
-const [x] = %InvokeCustomMatcherOrThrow%(C, subject);
+const [x] = %InvokeCustomMatcherOrThrow%(C, subject, undefined);
 ```
 
 such that `x` results in the value `"data"`.
@@ -374,7 +378,7 @@ const C(x, y) = subject;
 is approximately the same as the transposed representation
 
 ```js
-const [x, y] = %InvokeCustomMatcherOrThrow%(C, subject);
+const [x, y] = %InvokeCustomMatcherOrThrow%(C, subject, undefined);
 ```
 
 such that `x` and `y` result in the values `1` and `2`, respectively.
@@ -414,7 +418,7 @@ const C(x, ...y) = subject;
 is approximately the same as the transposed representation
 
 ```js
-const [x, ...y] = %InvokeCustomMatcherOrThrow%(C, subject);
+const [x, ...y] = %InvokeCustomMatcherOrThrow%(C, subject, undefined);
 ```
 
 such that `x` and `y` result in the values `1` and `[2, 3]`, respectively.
@@ -453,7 +457,7 @@ const C(x = -1, y) = subject;
 is approximately the same as the transposed representation
 
 ```js
-const [x = -1, y] = %InvokeCustomMatcherOrThrow%(C, subject);
+const [x = -1, y] = %InvokeCustomMatcherOrThrow%(C, subject, undefined);
 ```
 
 such that `x` and `y` result in the values `-1` and `2`, respectively.
@@ -489,7 +493,7 @@ const C({ x, y }) = subject;
 is approximately the same as the transposed representation
 
 ```js
-const [{ x, y }] = %InvokeCustomMatcherOrThrow%(C, subject);
+const [{ x, y }] = %InvokeCustomMatcherOrThrow%(C, subject, undefined);
 ```
 
 such that `x` and `y` have the values `1` and `2`, respectively.
@@ -534,8 +538,8 @@ const C(D(x)) = subject;
 is approximately the same as the transposed representation
 
 ```js
-const [_a] = %InvokeCustomMatcherOrThrow%(C, subject);
-const [x] = %InvokeCustomMatcherOrThrow%(D, _a);
+const [_a] = %InvokeCustomMatcherOrThrow%(C, subject, undefined);
+const [x] = %InvokeCustomMatcherOrThrow%(D, _a, undefined);
 ```
 
 such that `x` results in the value `"data"`.
@@ -576,7 +580,7 @@ is approximately the same as the transposed representation
 
 ```js
 const { map: _temp } = obj;
-const [{ a, b }] = %InvokeCustomMatcherOrThrow%(MapExtractor, _temp);
+const [{ a, b }] = %InvokeCustomMatcherOrThrow%(MapExtractor, _temp, undefined);
 ```
 
 such that `a` and `b` result in the values `1` and `2`, respectively.
@@ -613,6 +617,48 @@ const IsoDateTime({
 // 2. Matches `date` via `IsoDate` RegExp and extracts `year`, `month`, and `day` as lexical bindings
 // 3. Matches `time` vai `IsoTime` RegExp and extracts `hours`, `minutes`, and `seconds` as lexical bindings
 ```
+
+## Receivers: `const obj.extractor(x) = subject`
+
+When the _ExtractorMemberExpression_ results in a Reference, the receiver is preserved and passed on to the custom
+matcher:
+
+Given,
+
+```js
+class C {
+  #f;
+  constructor(f) {
+    this.#f = f;
+  }
+  extractor = {
+      [Symbol.customMatcher](subject, _kind, receiver) {
+        return receiver.#f(subject);
+      }
+  };
+}
+
+const obj = new C(data => data.toUpperCase());
+const subject = "data";
+
+const obj.extractor(x) = subject;
+x; // "DATA"
+```
+
+The statement
+
+```js
+const obj.extractor(x) = subject;
+```
+
+is approximately the same as the transposed representation
+
+```js
+const _receiver = obj;
+const [x] = %InvokeCustomMatcherOrThrow%(_receiver.extractor, subject, _receiver);
+```
+
+such that `x` results in the value `"DATA"`.
 
 # Potential Grammar
 
