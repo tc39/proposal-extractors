@@ -673,15 +673,15 @@ For the proposed semantics, see [the specification text](https://tc39.es/proposa
 This proposal would adopt (and continue to align with) the behavior of _Custom Matchers_ from the Pattern Matching proposal:
 
 - A _Custom Matcher_ is a regular ECMAScript Object value with a `[Symbol.customMatcher]` method that accepts a three
-  arguments &mdash; `subject` (the value to match against), `hint` (either `"boolean"` or `"list"`), and `receiver`
-  &mdash; and returns either a Boolean or an _Iterable_, depending on the value of `hint`.
+  arguments: `subject` (the value to match against), `hint` (either `"boolean"` or `"list"`), and `receiver`,
+  and returns either a Boolean or an _Iterable_, depending on the value of `hint`.
 - When `hint` is `"boolean"`, the return value will be coerced to a Boolean via the ToBoolean() abstract operation. When
   `hint` is `"list"`, the return value value must either be an _Iterable_ object or a falsy value (i.e., `false`, `0`,
   `null`, `undefined`, etc.).
-- In Pattern Matching, a `hint` of `"boolean"` can be used to avoid the costly allocation of
-  an _Iterable_ object when the return value won't be used for further matching (such as with `x is C`), while a `hint`
-  of `"list"` indicates further matching will be performed on the result (such as with `x is C(1, 2)`).
-- For destructuring and binding patterns (e.g., this proposal), `hint` will always be `"list"`.
+  - In Pattern Matching, a `hint` of `"boolean"` can be used to avoid the costly allocation of
+    an _Iterable_ object when the return value won't be used for further matching (such as with `x is C`), while a `hint`
+    of `"list"` indicates further matching will be performed on the result (such as with `x is C(1, 2)`).
+  - For destructuring and binding patterns (e.g., this proposal), `hint` will always be `"list"`.
 
 # Relation to Pattern Matching
 
