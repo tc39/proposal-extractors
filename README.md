@@ -41,7 +41,7 @@ _For more information see the [TC39 proposal process](https://tc39.es/process-do
 
 # Motivations
 
-ECMAScript currently has no mechanism for executing user-defined logic during destructuring, which means that operations
+ECMAScript currently has no mechanism for executing user-defined logic as part of destructuring, which means that operations
 related to data validation and transformation may require multiple statements:
 
 ```js
