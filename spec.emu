@@ -767,11 +767,36 @@ contributors: Ron Buckton, Ecma International
   <emu-clause id="sec-assignment-operators">
     <h1>Assignment Operators</h1>
 
+    <emu-clause id="sec-assignment-operators-static-semantics-early-errors">
+      <h1>Static Semantics: Early Errors</h1>
+      <emu-grammar>AssignmentExpression : LeftHandSideExpression `=` AssignmentExpression</emu-grammar>
+      <ul>
+        <li>
+          If |LeftHandSideExpression| is either an |ObjectLiteral|<del> or</del><ins>,</ins> an |ArrayLiteral|<ins>, a |FunctionCall|, or a |CoverCallExpressionAndAsyncArrowHead|</ins>, |LeftHandSideExpression| must cover an |AssignmentPattern|.
+        </li>
+        <li>
+          If |LeftHandSideExpression| is neither an |ObjectLiteral|<del> nor</del><ins>,</ins> an |ArrayLiteral|<ins>, a |FunctionCall|, nor a |CoverCallExpressionAndAsyncArrowHead|</ins>, it is a Syntax Error if the AssignmentTargetType of |LeftHandSideExpression| is not ~simple~.
+        </li>
+      </ul>
+      <emu-grammar>
+        AssignmentExpression :
+          LeftHandSideExpression AssignmentOperator AssignmentExpression
+          LeftHandSideExpression `&amp;&amp;=` AssignmentExpression
+          LeftHandSideExpression `||=` AssignmentExpression
+          LeftHandSideExpression `??=` AssignmentExpression
+      </emu-grammar>
+      <ul>
+        <li>
+          It is a Syntax Error if the AssignmentTargetType of |LeftHandSideExpression| is not ~simple~.
+        </li>
+      </ul>
+    </emu-clause>
+
     <emu-clause id="sec-assignment-operators-runtime-semantics-evaluation" type="sdo">
       <h1>Runtime Semantics: Evaluation</h1>
       <emu-grammar>AssignmentExpression : LeftHandSideExpression `=` AssignmentExpression</emu-grammar>
       <emu-alg>
-        1. If |LeftHandSideExpression| is neither an |ObjectLiteral|<del> nor</del><ins>,</ins> an |ArrayLiteral|<ins>, a |FunctionCall|, nor a |CallMemberExpression|</ins>, then
+        1. If |LeftHandSideExpression| is neither an |ObjectLiteral|<del> nor</del><ins>,</ins> an |ArrayLiteral|<ins>, a |FunctionCall|, nor a |CoverCallExpressionAndAsyncArrowHead|</ins>, then
           1. Let _lref_ be ? Evaluation of |LeftHandSideExpression|.
           1. If IsAnonymousFunctionDefinition(|AssignmentExpression|) and IsIdentifierRef of |LeftHandSideExpression| are both *true*, then
             1. Let _rval_ be ? NamedEvaluation of |AssignmentExpression| with argument _lref_.[[ReferencedName]].
@@ -939,10 +964,10 @@ contributors: Ron Buckton, Ecma International
         <emu-grammar>DestructuringAssignmentTarget : LeftHandSideExpression</emu-grammar>
         <ul>
           <li>
-            If |LeftHandSideExpression| is either an |ObjectLiteral|<del> or</del><ins>,</ins> an |ArrayLiteral|<ins>, a |FunctionCall|, or a |CallMemberExpression|</ins>, |LeftHandSideExpression| must cover an |AssignmentPattern|.
+            If |LeftHandSideExpression| is either an |ObjectLiteral|<del> or</del><ins>,</ins> an |ArrayLiteral|<ins>, a |FunctionCall|, or a |CoverCallExpressionAndAsyncArrowHead|</ins>, |LeftHandSideExpression| must cover an |AssignmentPattern|.
           </li>
           <li>
-            If |LeftHandSideExpression| is neither an |ObjectLiteral|<del> nor</del><ins>,</ins> an |ArrayLiteral|<ins>, a |FunctionCall|, nor a |CallMemberExpression|</ins>, it is a Syntax Error if AssignmentTargetType of |LeftHandSideExpression| is not ~simple~.
+            If |LeftHandSideExpression| is neither an |ObjectLiteral|<del> nor</del><ins>,</ins> an |ArrayLiteral|<ins>, a |FunctionCall|, nor a |CoverCallExpressionAndAsyncArrowHead|</ins>, it is a Syntax Error if the AssignmentTargetType of |LeftHandSideExpression| is not ~simple~.
           </li>
         </ul>
       </emu-clause>
