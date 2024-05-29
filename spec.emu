@@ -907,9 +907,9 @@ contributors: Ron Buckton, Ecma International
 
         <ins class="block">
         ExtractorAssignmentPattern[Yield, Await] :
-          ExtractorMemberExpression[?Yield, ?Await] `(` Elision? AssignmentRestElement[?Yield, ?Await]? `)`
-          ExtractorMemberExpression[?Yield, ?Await] `(` AssignmentElementList[?Yield, ?Await] `)`
-          ExtractorMemberExpression[?Yield, ?Await] `(` AssignmentElementList[?Yield, ?Await] `,` Elision? AssignmentRestElement[?Yield, ?Await]? `)`
+          ExtractorMemberExpression[?Yield, ?Await] [no |LineTerminator| here] `(` Elision? AssignmentRestElement[?Yield, ?Await]? `)`
+          ExtractorMemberExpression[?Yield, ?Await] [no |LineTerminator| here] `(` AssignmentElementList[?Yield, ?Await] `)`
+          ExtractorMemberExpression[?Yield, ?Await] [no |LineTerminator| here] `(` AssignmentElementList[?Yield, ?Await] `,` Elision? AssignmentRestElement[?Yield, ?Await]? `)`
         </ins>
 
         AssignmentRestProperty[Yield, Await] :
@@ -1277,18 +1277,18 @@ contributors: Ron Buckton, Ecma International
         <ins class="block">
         <emu-grammar type="definition">
         ExtractorBindingPattern[Yield, Await] :
-          ExtractorMemberExpression[?Yield, ?Await] `(` Elision? BindingRestElement[?Yield, ?Await]? `)`
-          ExtractorMemberExpression[?Yield, ?Await] `(` BindingElementList[?Yield, ?Await] `)`
-          ExtractorMemberExpression[?Yield, ?Await] `(` BindingElementList[?Yield, ?Await] `,` Elision? BindingRestElement[?Yield, ?Await]? `)`
+          ExtractorMemberExpression[?Yield, ?Await] [no |LineTerminator| here] `(` Elision? BindingRestElement[?Yield, ?Await]? `)`
+          ExtractorMemberExpression[?Yield, ?Await] [no |LineTerminator| here] `(` BindingElementList[?Yield, ?Await] `)`
+          ExtractorMemberExpression[?Yield, ?Await] [no |LineTerminator| here] `(` BindingElementList[?Yield, ?Await] `,` Elision? BindingRestElement[?Yield, ?Await]? `)`
 
-        ExtractorMemberExpression[Yield, Await] :
+        ExtractorMemberExpression[Yield, Await, Assignment] :
           `this`
           MetaProperty
           IdentifierReference[?Yield, ?Await]
           `super` `.` IdentifierName
           ExtractorMemberExpression[?Yield, ?Await] `.` IdentifierName
           ExtractorMemberExpression[?Yield, ?Await] `.` PrivateIdentifier
-          ExtractorMemberExpression[?Yield, ?Await] `[` Expression[+In, ?Yield, ?Await] `]`
+          ExtractorMemberExpression[?Yield, ?Await] [no |LineTerminator| here] `[` Expression[+In, ?Yield, ?Await] `]`
         </emu-grammar>
         <emu-note type="editor">
           <p>Draft Note: The |ExtractorMemberExpression| production is equivalent to <a href="https://tc39.es/proposal-pattern-matching/#prod-PatternMatchingMemberExpression">PatternMatchingMemberExpression</a> in the <a href="https://github.com/tc39/proposal-pattern-matching">Pattern Matching</a> proposal.</p>
