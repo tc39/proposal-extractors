@@ -2,32 +2,6 @@
 
 A proposal to introduce Extractors (a.k.a. "Extractor Objects") to ECMAScript.
 
-Extractors would augment the syntax for _BindingPattern_ and _AssignmentPattern_ to allow for new destructuring forms,
-as in the following example:
-
-```js
-// binding patterns
-const Foo(y) = x;           // instance-array destructuring
-const Foo([y]) = x;         // nested array destructuring
-const Foo({y}) = x;         // nested object destructuring
-const [Foo(y)] = x;         // nesting
-const { z: Foo(y) } = x;    // ..
-const Foo(Bar(y)) = x;      // ..
-const X.Foo(y) = x;         // qualified names (i.e., a.b.c)
-
-// assignment patterns
-Foo(y) = x;                 // instance-array destructuring
-Foo([y]) = x;               // nestedarray destructuring
-Foo({y}) = x;               // nested object destructuring
-[Foo(y)] = x;               // nesting
-({ z: Foo(y) } = x);        // ..
-Foo(Bar(y)) = x;            // ..
-X.Foo(y) = x;               // qualified names (i.e., a.b.c)
-```
-
-In addition, this would leverage the new `Symbol.customMatcher` built-in symbol added by the Pattern Matching proposal. When
-destructuring using the new form, the `Symbol.customMatcher` method would be called and its result would be destructured instead.
-
 ## Status
 
 **Stage:** 1  \
@@ -179,6 +153,32 @@ result's `[Symbol.customMatcher]()` method is invoked with the current value to 
 object that indicates the match succeeded, and the extracted elements to use for further destructuring. For the purpose
 of destructuring, any other value will produce a *TypeError*. In the case of pattern matching, `true` and `false` are
 also valid return values.
+
+Extractors would augment the syntax for _BindingPattern_ and _AssignmentPattern_ to allow for new destructuring forms,
+as in the following example:
+
+```js
+// binding patterns
+const Foo(y) = x;           // instance-array destructuring
+const Foo([y]) = x;         // nested array destructuring
+const Foo({y}) = x;         // nested object destructuring
+const [Foo(y)] = x;         // nesting
+const { z: Foo(y) } = x;    // ..
+const Foo(Bar(y)) = x;      // ..
+const X.Foo(y) = x;         // qualified names (i.e., a.b.c)
+
+// assignment patterns
+Foo(y) = x;                 // instance-array destructuring
+Foo([y]) = x;               // nestedarray destructuring
+Foo({y}) = x;               // nested object destructuring
+[Foo(y)] = x;               // nesting
+({ z: Foo(y) } = x);        // ..
+Foo(Bar(y)) = x;            // ..
+X.Foo(y) = x;               // qualified names (i.e., a.b.c)
+```
+
+In addition, this would leverage the new `Symbol.customMatcher` built-in symbol added by the Pattern Matching proposal. When
+destructuring using the new form, the `Symbol.customMatcher` method would be called and its result would be destructured instead.
 
 An _Extractor_ consists of an _ExtractorMemberExpression_ followed by a parenthesized list of additional destructuring patterns:
 
