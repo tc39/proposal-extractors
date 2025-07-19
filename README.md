@@ -235,7 +235,7 @@ const Message = {
     #x;
     #y;
     ...
-    static [Symbol.match](value) {
+    static [Symbol.customMatcher](value) {
       if (value instanceof Message.Move) {
         // 'match: "unary"' indicates that 'value' is the sole extracted value
         return { match: "unary", value: { x: value.#x, y: value.#y } };
@@ -320,8 +320,8 @@ class C {
   constructor(data) {
     this.#data = data;
   }
-  [Symbol.customMatcher](subject) {
-    return #data in subject && [this.#data];
+  static [Symbol.customMatcher](subject) {
+    return #data in subject && [subject.#data];
   }
 }
 
@@ -357,8 +357,8 @@ class C {
     this.#first = first;
     this.#second = second;
   }
-  [Symbol.customMatcher](subject) {
-    return #first in subject && [this.#first, this.#second];
+  static [Symbol.customMatcher](subject) {
+    return #first in subject && [subject.#first, subject.#second];
   }
 }
 
@@ -397,8 +397,8 @@ class C {
     this.#second = second;
     this.#third = third;
   }
-  [Symbol.customMatcher](subject) {
-    return #first in subject && [this.#first, this.#second, this.#third];
+  static [Symbol.customMatcher](subject) {
+    return #first in subject && [subject.#first, subject.#second, subject.#third];
   }
 }
 
@@ -436,8 +436,8 @@ class C {
     this.#first = first;
     this.#second = second;
   }
-  [Symbol.customMatcher](subject) {
-    return #first in subject && [this.#first, this.#second];
+  static [Symbol.customMatcher](subject) {
+    return #first in subject && [subject.#first, subject.#second];
   }
 }
 
@@ -472,8 +472,8 @@ class C {
   constructor(data) {
     this.#data = data;
   }
-  [Symbol.customMatcher](subject) {
-    return #data in subject && [this.#data];
+  static [Symbol.customMatcher](subject) {
+    return #data in subject && [subject.#data];
   }
 }
 
@@ -508,8 +508,8 @@ class C {
   constructor(data1) {
     this.#data1 = data1;
   }
-  [Symbol.customMatcher](subject) {
-    return #data1 in subject && [this.#data1];
+  static [Symbol.customMatcher](subject) {
+    return #data1 in subject && [subject.#data1];
   }
 }
 
@@ -518,12 +518,12 @@ class D {
   constructor(data2) {
     this.#data2 = data2;
   }
-  [Symbol.customMatcher](subject) {
-    return #data2 in subject && [this.#data2];
+  static [Symbol.customMatcher](subject) {
+    return #data2 in subject && [subject.#data2];
   }
 }
 
-const subject = new C(D("data"));
+const subject = new C(new D("data"));
 
 const C(D(x)) = subject;
 x; // "data"
