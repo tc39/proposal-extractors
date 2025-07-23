@@ -633,7 +633,7 @@ class C {
   }
   extractor = {
       [Symbol.customMatcher](subject, _kind, receiver) {
-        return receiver.#f(subject);
+        return [receiver.#f(subject)];
       }
   };
 }
